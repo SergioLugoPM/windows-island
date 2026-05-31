@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import { Clock, type ClockFormat } from "./Clock";
 import { MediaMini, MediaFull, MediaCompact } from "./MediaView";
+import { StatsFull, StatsMini } from "./StatsView";
 import { WeatherView } from "./WeatherView";
 import { AudioVisualizer } from "./AudioVisualizer";
 import { useAudioVisualizer } from "../hooks/useAudioVisualizer";
@@ -11,7 +12,7 @@ import { isTauri } from "../App";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Mode = "idle" | "peek" | "media" | "full" | "settings";
+type Mode = "idle" | "peek" | "media" | "stats" | "full" | "settings";
 
 /** "top" = snapped to top edge (cursor must reach screen top to activate).
  *  "floating" = free drag, always reacts to hover. */
@@ -28,7 +29,7 @@ function edgeRadius(r: number, edge: SnapEdge): string {
   }
 }
 
-export type PeekContent = "weather" | "media";
+export type PeekContent = "weather" | "media" | "stats";
 export type Theme       = "dark" | "light" | "glass";
 export type ClockSize   = "S" | "M" | "L";
 
@@ -78,18 +79,19 @@ const IDLE_DIMS: Record<ClockSize, { w: number; h: number; r: number }> = {
 
 // Other modes are fixed
 const DIMS: Record<Mode, { w: number; h: number; r: number }> = {
-  idle:     { w: 160, h: 64,  r: 32 }, // M fallback — overridden by getModeDims
+  idle:     { w: 160, h: 64,  r: 32 },
   peek:     { w: 310, h: 68,  r: 34 },
   media:    { w: 350, h: 122, r: 28 },
+  stats:    { w: 280, h: 110, r: 24 },
   full:     { w: 370, h: 158, r: 30 },
-  settings: { w: 310, h: 210, r: 28 },
+  settings: { w: 310, h: 232, r: 28 },
 };
 
 function getModeDims(mode: Mode, clockSize: ClockSize) {
   return mode === "idle" ? IDLE_DIMS[clockSize] : DIMS[mode];
 }
 
-const CYCLE: Mode[] = ["peek", "media", "full"];
+const CYCLE: Mode[] = ["peek", "media", "stats", "full"];
 const spring     = { type: "spring" as const, stiffness: 480, damping: 36, mass: 0.75 };
 const springFast = { type: "spring" as const, stiffness: 600, damping: 38, mass: 0.6 };
 
@@ -330,8 +332,8 @@ export function Island() {
       return nextMode;
     });
 
-    scheduleCollapse(5000);
-  }, [cancelCollapse, scheduleCollapse, pulseControls, settings.clockSize]);
+    // Collapse triggered by handleMouseLeave only — never while cursor is over island.
+  }, [cancelCollapse, pulseControls, settings.clockSize, settings.positionMode]);
 
   // ── Long press → settings ──
   const longPressTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -480,10 +482,9 @@ export function Island() {
               >
                 <Clock variant="expanded" format={settings.clockFormat} />
                 <div style={{ width: 1, height: 28, background: "rgba(80,100,200,0.2)", flexShrink: 0 }} />
-                {settings.peekContent === "weather"
-                  ? <WeatherView compact />
-                  : <MediaMini />
-                }
+                {settings.peekContent === "weather" && <WeatherView compact />}
+                {settings.peekContent === "media"   && <MediaMini />}
+                {settings.peekContent === "stats"   && <StatsMini />}
               </motion.div>
             )}
 
@@ -497,6 +498,19 @@ export function Island() {
                 style={{ width: "100%" }}
               >
                 <MediaFull />
+              </motion.div>
+            )}
+
+            {/* ── STATS ── */}
+            {mode === "stats" && (
+              <motion.div key="stats"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={springFast}
+                style={{ width: "100%" }}
+              >
+                <StatsFull />
               </motion.div>
             )}
 
@@ -576,6 +590,8 @@ export function Island() {
                         onClick={(e) => { e.stopPropagation(); setPeekContent("weather"); }}>Clima</button>
                       <button className={`settings-opt ${settings.peekContent === "media" ? "active" : ""}`}
                         onClick={(e) => { e.stopPropagation(); setPeekContent("media"); }}>Música</button>
+                      <button className={`settings-opt ${settings.peekContent === "stats" ? "active" : ""}`}
+                        onClick={(e) => { e.stopPropagation(); setPeekContent("stats"); }}>Sistema</button>
                     </div>
                   </div>
 

@@ -6,6 +6,10 @@ pub struct MediaInfo {
     pub artist: String,
     pub is_playing: bool,
     pub has_session: bool,
+    /// Current playback position in seconds.
+    pub position_s: f64,
+    /// Total track duration in seconds (0 if unknown / livestream).
+    pub duration_s: f64,
 }
 
 // ─── Windows implementation ───────────────────────────────────────────────────
@@ -86,7 +90,27 @@ fn get_media_blocking() -> MediaInfo {
         .map(|s| s == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing)
         .unwrap_or(false);
 
-    MediaInfo { title, artist, is_playing, has_session: true }
+    // Timeline — current position + total duration.
+    // TimeSpan::Duration is in 100-ns ticks; divide by 1e7 for seconds.
+    let (position_s, duration_s) = session
+        .GetTimelineProperties()
+        .ok()
+        .map(|tl| {
+            let pos = tl.Position().map(|d| d.Duration as f64 / 1e7).unwrap_or(0.0);
+            let end = tl.EndTime().map(|d| d.Duration as f64 / 1e7).unwrap_or(0.0);
+            let start = tl.StartTime().map(|d| d.Duration as f64 / 1e7).unwrap_or(0.0);
+            // Some apps report Position relative to StartTime (Spotify), others absolute.
+            // Normalize by subtracting start so position is always relative to 0.
+            let p = (pos - start).max(0.0);
+            let d = (end - start).max(0.0);
+            (p, d)
+        })
+        .unwrap_or((0.0, 0.0));
+
+    MediaInfo {
+        title, artist, is_playing, has_session: true,
+        position_s, duration_s,
+    }
 }
 
 #[cfg(windows)]

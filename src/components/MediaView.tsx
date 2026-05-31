@@ -8,6 +8,8 @@ export interface MediaInfo {
   artist: string;
   is_playing: boolean;
   has_session: boolean;
+  position_s: number;
+  duration_s: number;
 }
 
 async function invokeMedia(cmd: string): Promise<unknown> {
@@ -19,27 +21,68 @@ async function invokeMedia(cmd: string): Promise<unknown> {
   }
 }
 
+/**
+ * useMediaInfo
+ *  - Polls the Rust backend every 3s for media state.
+ *  - Returns `progress` (0..1) interpolated client-side between polls so the
+ *    progress bar advances smoothly at 30 fps without 30 round-trips per second.
+ */
 function useMediaInfo() {
   const [info, setInfo] = useState<MediaInfo>({
     title: "", artist: "", is_playing: false, has_session: false,
+    position_s: 0, duration_s: 0,
   });
+  // pollAt = monotonic timestamp (ms) when the current `info` was received.
+  // We interpolate position forward from pollAt + position_s while is_playing.
+  const [pollAt, setPollAt] = useState(() => performance.now());
+  const [now, setNow] = useState(() => performance.now());
 
   const refresh = useCallback(async () => {
     const r = await invokeMedia("get_media_info") as MediaInfo | null;
-    if (r) setInfo(r);
+    if (r) {
+      setInfo(r);
+      setPollAt(performance.now());
+    }
   }, []);
 
+  // Poll every 3s
   useEffect(() => {
     refresh();
     const id = setInterval(refresh, 3000);
     return () => clearInterval(id);
   }, [refresh]);
 
+  // Tick `now` 4×/s only when playing — drives smooth progress bar interpolation
+  useEffect(() => {
+    if (!info.is_playing) return;
+    const id = setInterval(() => setNow(performance.now()), 250);
+    return () => clearInterval(id);
+  }, [info.is_playing]);
+
+  // Interpolated current position
+  const elapsedSincePoll = info.is_playing ? (now - pollAt) / 1000 : 0;
+  const liveSeconds = Math.min(
+    info.position_s + elapsedSincePoll,
+    info.duration_s > 0 ? info.duration_s : Number.MAX_SAFE_INTEGER,
+  );
+  const progress = info.duration_s > 0 ? liveSeconds / info.duration_s : 0;
+
   const togglePlay = async (e: React.MouseEvent) => { e.stopPropagation(); await invokeMedia("toggle_play_pause"); setTimeout(refresh, 400); };
   const skipNext   = async (e: React.MouseEvent) => { e.stopPropagation(); await invokeMedia("skip_next");         setTimeout(refresh, 400); };
   const skipPrev   = async (e: React.MouseEvent) => { e.stopPropagation(); await invokeMedia("skip_previous");     setTimeout(refresh, 400); };
 
-  return { info, togglePlay, skipNext, skipPrev };
+  return { info, progress, liveSeconds, togglePlay, skipNext, skipPrev };
+}
+
+/** Format seconds as M:SS / H:MM:SS */
+function fmtTime(s: number): string {
+  if (!isFinite(s) || s <= 0) return "0:00";
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = Math.floor(s % 60);
+  return h > 0
+    ? `${h}:${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`
+    : `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
 interface Props {
@@ -75,7 +118,7 @@ export function MediaMini() {
 
 // ── Full: vinyl + visualizador + controles ────────────────────────────────
 export function MediaFull() {
-  const { info, togglePlay, skipNext, skipPrev } = useMediaInfo();
+  const { info, progress, liveSeconds, togglePlay, skipNext, skipPrev } = useMediaInfo();
   const audio = useAudioVisualizer(info.is_playing, 22);
 
   if (!info.has_session) {
@@ -85,6 +128,9 @@ export function MediaFull() {
       </div>
     );
   }
+
+  const hasDuration = info.duration_s > 0;
+  const widthPct = `${Math.min(100, Math.max(0, progress * 100))}%`;
 
   return (
     <div className="media-vinyl-layout">
@@ -104,11 +150,28 @@ export function MediaFull() {
             {info.is_playing ? "⏸" : "▶"}
           </button>
           <button className="media-btn" onClick={skipNext}>⏭</button>
-          <div className="media-progress" style={{ flex: 1, marginLeft: 6, marginBottom: 0 }}>
-            <div className="media-progress-fill"
-              style={{ animation: info.is_playing ? undefined : "none", width: info.is_playing ? undefined : "35%" }}
-            />
-          </div>
+
+          {hasDuration ? (
+            <div className="media-progress" style={{ flex: 1, marginLeft: 6, marginBottom: 0, position: "relative" }}>
+              <div className="media-progress-fill"
+                style={{ width: widthPct, animation: "none", transition: "width 0.25s linear" }}
+              />
+              <div style={{
+                position: "absolute", right: -38, top: -6, fontSize: 8,
+                color: "rgba(160,180,220,0.7)", fontVariantNumeric: "tabular-nums",
+                whiteSpace: "nowrap",
+              }}>
+                {fmtTime(liveSeconds)} / {fmtTime(info.duration_s)}
+              </div>
+            </div>
+          ) : (
+            // No duration (livestream or app didn't report) — show animated bar
+            <div className="media-progress" style={{ flex: 1, marginLeft: 6, marginBottom: 0 }}>
+              <div className="media-progress-fill"
+                style={{ animation: info.is_playing ? undefined : "none", width: info.is_playing ? undefined : "35%" }}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

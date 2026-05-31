@@ -1,4 +1,5 @@
 pub mod media;
+pub mod stats;
 pub mod weather;
 
 use std::{
@@ -82,6 +83,7 @@ mod win_sys {
 #[derive(Default)]
 pub struct AppState {
     weather_cache: Arc<Mutex<Option<(weather::WeatherInfo, Instant)>>>,
+    stats: Arc<stats::StatsState>,
 }
 
 // ─── Tauri commands ───────────────────────────────────────────────────────────
@@ -196,6 +198,11 @@ async fn skip_next() -> Result<(), String> { media::skip_next().await }
 async fn skip_previous() -> Result<(), String> { media::skip_previous().await }
 
 #[tauri::command]
+fn get_system_stats(state: State<'_, AppState>) -> stats::SystemStats {
+    stats::collect(&state.stats)
+}
+
+#[tauri::command]
 async fn get_weather(city: String, state: State<'_, AppState>) -> Result<weather::WeatherInfo, String> {
     {
         let cache = state.weather_cache.lock().unwrap();
@@ -307,6 +314,7 @@ pub fn run() {
             skip_next,
             skip_previous,
             get_weather,
+            get_system_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error running windows-island");
