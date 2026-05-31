@@ -1,0 +1,11 @@
+{
+  "cpu": "CPU",
+  "ram": "RAM",
+  "battery": "BAT",
+  "charging": "⚡ cargando",
+  "weather": "Clima",
+  "settings": "Configuración",
+  "hide": "Ocultar",
+  "show": "Mostrar",
+  "quit": "Salir"
+}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useI18n } from "../hooks/useI18n";
 
 export interface SystemStats {
   cpu_percent:       number;
@@ -67,26 +68,27 @@ function colorForLoad(p: number): string {
 
 export function StatsFull() {
   const s = useSystemStats();
+  const { t } = useI18n();
   const hasBattery = s.battery_percent >= 0;
 
   return (
     <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 7 }}>
-      <StatRow label="CPU"
+      <StatRow label={t("cpu")}
         value={`${s.cpu_percent.toFixed(0)}%`}
         sub={s.cpu_temp_c !== null ? `${s.cpu_temp_c.toFixed(0)}°C` : undefined}
         bar={s.cpu_percent / 100}
         color={colorForLoad(s.cpu_percent)}
       />
-      <StatRow label="RAM"
+      <StatRow label={t("ram")}
         value={`${s.ram_percent.toFixed(0)}%`}
         sub={`${(s.ram_used_mb / 1024).toFixed(1)} / ${(s.ram_total_mb / 1024).toFixed(1)} GB`}
         bar={s.ram_percent / 100}
         color={colorForLoad(s.ram_percent)}
       />
       {hasBattery && (
-        <StatRow label="BAT"
+        <StatRow label={t("battery")}
           value={`${s.battery_percent}%`}
-          sub={s.battery_charging ? "⚡ cargando" : undefined}
+          sub={s.battery_charging ? t("charging") : undefined}
           bar={s.battery_percent / 100}
           color={
             s.battery_percent < 20 ? "rgba(255,110,110,0.95)" :
