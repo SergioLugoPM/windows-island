@@ -425,8 +425,10 @@ export function Island() {
         onClick={handleClick}
         style={motionStyle}
       >
-        {/* Boom rings — idle + music playing */}
-        {mode === "idle" && isPlaying && (
+        {/* Boom rings — visible in any mode whenever media is playing.
+            The inset box-shadow respects border-radius (incl. animated radius),
+            so they work in all three themes. */}
+        {isPlaying && (
           <>
             <div className="boom-ring" />
             <div className="boom-ring boom-ring-2" />

@@ -138,13 +138,10 @@ fn battery_status() -> (i32, bool) {
 #[cfg(not(windows))]
 fn battery_status() -> (i32, bool) { (-1, false) }
 
-// ─── Optional CPU temperature via LibreHardwareMonitor HTTP server ──────────
-// LHM exposes a JSON endpoint at http://localhost:8085/data.json when its
-// built-in HTTP server is enabled (Options → Web server). Silent best-effort.
+// ─── CPU temperature ────────────────────────────────────────────────────────
+// Reads from Core Temp's shared memory (if Core Temp is running). Otherwise None.
+// See cpu_temp.rs for the FFI details.
 
 fn read_cpu_temp_lhm() -> Option<f32> {
-    // Blocking call inside a sysinfo refresh — use ureq via reqwest's blocking?
-    // We already have reqwest with async features. For simplicity here, skip
-    // the HTTP probe in this synchronous context. Future: move to async path.
-    None
+    crate::cpu_temp::read_core_temp()
 }

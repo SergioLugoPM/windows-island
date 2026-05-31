@@ -1,3 +1,4 @@
+pub mod cpu_temp;
 pub mod media;
 pub mod stats;
 pub mod weather;
