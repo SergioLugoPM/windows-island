@@ -15,7 +15,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use std::time::Instant;
-use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
+use sysinfo::{CpuRefreshKind, MemoryRefreshKind, Networks, RefreshKind, System};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct SystemStats {
@@ -38,6 +38,7 @@ pub struct SystemStats {
 
 pub struct StatsState {
     pub sys: Mutex<System>,
+    pub networks: Mutex<Networks>,
     pub last_refresh: Mutex<Instant>,
 }
 
@@ -48,7 +49,12 @@ impl StatsState {
                 .with_cpu(CpuRefreshKind::everything())
                 .with_memory(MemoryRefreshKind::everything()),
         );
-        Self { sys: Mutex::new(sys), last_refresh: Mutex::new(Instant::now()) }
+        let networks = Networks::new_with_refreshed_list();
+        Self {
+            sys: Mutex::new(sys),
+            networks: Mutex::new(networks),
+            last_refresh: Mutex::new(Instant::now()),
+        }
     }
 }
 
@@ -60,6 +66,7 @@ impl Default for StatsState {
 /// First call has a 200ms blocking pause to seed CPU deltas.
 pub fn collect(state: &StatsState) -> SystemStats {
     let mut sys = state.sys.lock().unwrap();
+    let mut networks = state.networks.lock().unwrap();
     let mut last = state.last_refresh.lock().unwrap();
 
     let now = Instant::now();
@@ -68,6 +75,7 @@ pub fn collect(state: &StatsState) -> SystemStats {
 
     sys.refresh_cpu_usage();
     sys.refresh_memory();
+    networks.refresh();
 
     let cpu_percent = sys.global_cpu_usage();
 
@@ -79,11 +87,13 @@ pub fn collect(state: &StatsState) -> SystemStats {
         (ram_used as f32 / ram_total as f32) * 100.0
     } else { 0.0 };
 
-    // Networks aren't included in sysinfo's reduced feature set, so we always
-    // report 0 KiB/s for now. (Future: gate behind a `networks` feature.)
-    let net_down_kbps = 0.0_f64;
-    let net_up_kbps   = 0.0_f64;
-    let _ = elapsed_s; // suppress unused warning
+    let (mut rx_bytes, mut tx_bytes) = (0u64, 0u64);
+    for (_name, net) in networks.iter() {
+        rx_bytes += net.received();
+        tx_bytes += net.transmitted();
+    }
+    let net_down_kbps = (rx_bytes as f64 / elapsed_s) / 1024.0;
+    let net_up_kbps   = (tx_bytes as f64 / elapsed_s) / 1024.0;
 
     let (battery_percent, battery_charging) = battery_status();
     let cpu_temp_c = read_cpu_temp_lhm();
