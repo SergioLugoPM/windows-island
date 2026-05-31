@@ -6,22 +6,23 @@ Versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Added
-- Real media progress bar — reads `Position()`, `StartTime()`, `EndTime()` from
-  `GlobalSystemMediaTransportControlsSession.TimelineProperties`. Client-side
-  interpolation at 4 Hz between 3 s polls so the bar moves smoothly.
-- Live `M:SS / M:SS` time display next to the progress bar.
+## [0.2.0] - 2026-05-31
 
-### Fixed
-- **Cycle no longer auto-collapses while the cursor is over the island.**
-  Previously `handleClick` scheduled a 5 s collapse that fired even with hover;
-  now only `handleMouseLeave` schedules a collapse (2.8 s after the cursor
-  leaves).
-- **Audio visualizer is now always animated when media is playing.**
-  Removed the `getUserMedia` path: it prompted the OS for microphone permission
-  (bad UX), and two hook instances on the same page (idle + media views) raced
-  for the same stream so one failed silently. Visualizer is now a deterministic
-  3-harmonic sine bank with golden-ratio phase spread.
+### Added
+- **Network metrics** — real-time download/upload speed in System Stats (via sysinfo
+  networks feature). Updated every 1.5s with running average.
+- **i18n support** — English and Spanish localizations. Strings cover Settings, Weather,
+  Stats labels (CPU/RAM/Battery), and system tray menu.
+- **Auto-updater** — integrated tauri-plugin-updater. App checks for updates on startup;
+  user prompted to download v0.2.1+. Requires valid update endpoint and public key.
+- **StatsView network display** — shows net↓ and net↑ in MiB/s alongside CPU/RAM/Battery.
+
+### Technical
+- Enabled sysinfo `networks` feature (was disabled to reduce binary size; network overhead
+  negligible in practice).
+- i18n backend in Rust (src-tauri/src/i18n.rs) + React hook (src/hooks/useI18n.ts).
+- Updater check fires async after Tauri setup in release builds (disabled in debug to avoid
+  prompts during development).
 
 ## [0.1.0] - 2026-05-30
 
