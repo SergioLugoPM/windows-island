@@ -12,13 +12,13 @@
 
 ---
 
-<!--
-  TODO — replace with real screenshots / GIFs:
+## Screenshots
 
-  ![Hero](docs/screenshots/hero.png)
-  ![Themes](docs/screenshots/themes.png)
-  ![Demo](docs/screenshots/demo.gif)
--->
+![Windows Island — Dark Theme (v0.2.0)](docs/screenshots/v0.2.0-island-dark-theme.png)
+*Dark theme with clock, weather, and network metrics*
+
+![Windows Island — System Stats (v0.2.0)](docs/screenshots/v0.2.0-stats-network.png)
+*Network metrics in System Stats cycle mode*
 
 ## Why?
 
