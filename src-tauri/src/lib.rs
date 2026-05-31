@@ -1,4 +1,5 @@
 pub mod cpu_temp;
+pub mod i18n;
 pub mod media;
 pub mod stats;
 pub mod weather;
@@ -85,6 +86,7 @@ mod win_sys {
 pub struct AppState {
     weather_cache: Arc<Mutex<Option<(weather::WeatherInfo, Instant)>>>,
     stats: Arc<stats::StatsState>,
+    pub i18n: Arc<Mutex<i18n::I18n>>,
 }
 
 // ─── Tauri commands ───────────────────────────────────────────────────────────
@@ -216,6 +218,16 @@ async fn get_weather(city: String, state: State<'_, AppState>) -> Result<weather
     Ok(info)
 }
 
+#[tauri::command]
+fn get_translation(state: State<'_, AppState>, key: String) -> String {
+    state.i18n.lock().unwrap().t(&key)
+}
+
+#[tauri::command]
+fn set_locale(state: State<'_, AppState>, locale: String) {
+    state.i18n.lock().unwrap().set_locale(&locale);
+}
+
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -300,6 +312,18 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // ── Auto-updater (release builds only) ──────────────────────────────
+            #[cfg(not(debug_assertions))]
+            {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    let _result = tauri_plugin_updater::Builder::new()
+                        .build()
+                        .check_update()
+                        .await;
+                });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -316,6 +340,8 @@ pub fn run() {
             skip_previous,
             get_weather,
             get_system_stats,
+            get_translation,
+            set_locale,
         ])
         .run(tauri::generate_context!())
         .expect("error running windows-island");
