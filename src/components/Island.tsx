@@ -9,6 +9,7 @@ import { useAudioVisualizer } from "../hooks/useAudioVisualizer";
 import { LiquidBackground } from "./LiquidBackground";
 import { LiquidGlassChrome } from "./LiquidGlassChrome";
 import { isTauri } from "../App";
+import { invoke } from '@tauri-apps/api/core';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -143,6 +144,11 @@ export function Island() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [snapEdge, setSnapEdge]   = useState<SnapEdge>("top");
 
+  // Theme injection state
+  const [injectionActive, setInjectionActive] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState<'dark' | 'light' | 'vidrio'>('dark');
+  const [injectionLoading, setInjectionLoading] = useState(false);
+
   const idleAudio = useAudioVisualizer(isPlaying, 18);
 
   const pulseControls  = useAnimation();
@@ -156,6 +162,15 @@ export function Island() {
 
   // ── Persist settings ──
   useEffect(() => { saveSettings(settings); }, [settings]);
+
+  // ── Check initial injection state ──
+  useEffect(() => {
+    if (isTauri) {
+      invoke<boolean>('is_injection_active')
+        .then(active => setInjectionActive(active))
+        .catch(err => console.error('Failed to check injection status:', err));
+    }
+  }, []);
 
   // ── Snap when positionMode changes ──
   useEffect(() => {
@@ -398,6 +413,26 @@ export function Island() {
   const setTheme        = (v: Theme)        => setSettings(s => ({ ...s, theme: v }));
   const setClockSize    = (v: ClockSize)    => setSettings(s => ({ ...s, clockSize: v }));
 
+  // ── Theme injection handler ──
+  const handleToggleInjection = async () => {
+    if (!isTauri) return;
+    setInjectionLoading(true);
+    try {
+      if (!injectionActive) {
+        await invoke('enable_theme_injection', { themeName: selectedTheme });
+        setInjectionActive(true);
+      } else {
+        await invoke('disable_theme_injection');
+        setInjectionActive(false);
+      }
+    } catch (error) {
+      console.error('Injection toggle failed:', error);
+      alert(`Error: ${error}`);
+    } finally {
+      setInjectionLoading(false);
+    }
+  };
+
   const cycleIndex = CYCLE.indexOf(mode as Exclude<Mode, "idle" | "settings">);
 
   const motionStyle = isTauri
@@ -608,7 +643,62 @@ export function Island() {
                     </div>
                   </div>
 
-                  <div style={{ fontSize: 9, color: "rgba(100,120,180,0.4)", textAlign: "center", marginTop: 2 }}>
+                  {/* Theme Injection */}
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(80,100,200,0.2)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 'bold', color: 'rgba(180,190,220,0.9)', marginBottom: 8 }}>
+                      🧪 Theme Injection (Experimental)
+                    </div>
+
+                    <div style={{ marginBottom: 8 }}>
+                      <span style={{ fontSize: 10, color: 'rgba(120,140,180,0.8)', display: 'block', marginBottom: 4 }}>
+                        Tema:
+                      </span>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {(['dark', 'light', 'vidrio'] as const).map(theme => (
+                          <label key={theme} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9 }}>
+                            <input
+                              type="radio"
+                              name="injectionTheme"
+                              value={theme}
+                              checked={selectedTheme === theme}
+                              onChange={(e) => { e.stopPropagation(); setSelectedTheme(theme); }}
+                              disabled={injectionLoading}
+                              style={{ transform: 'scale(0.8)' }}
+                            />
+                            <span style={{ textTransform: 'capitalize', color: 'rgba(160,170,200,0.9)' }}>
+                              {theme === 'vidrio' ? 'Vidrio' : theme === 'light' ? 'Claro' : 'Oscuro'}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleToggleInjection(); }}
+                      disabled={injectionLoading}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: injectionActive ? '#ff6b6b' : '#51cf66',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: injectionLoading ? 'not-allowed' : 'pointer',
+                        opacity: injectionLoading ? 0.6 : 1,
+                        fontSize: 10,
+                        fontWeight: 'bold',
+                        marginBottom: 6,
+                        width: '100%'
+                      }}
+                    >
+                      {injectionLoading ? 'Cargando...' : injectionActive ? 'Desactivar Injection' : 'Activar Injection'}
+                    </button>
+
+                    <div style={{ fontSize: 8, color: 'rgba(100,120,160,0.6)', textAlign: 'center' }}>
+                      Estado: {injectionActive ? '✓ Activo' : '○ Inactivo'}
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: 9, color: "rgba(100,120,180,0.4)", textAlign: "center", marginTop: 8 }}>
                     mantén presionado · Esc para cerrar
                   </div>
                 </div>
