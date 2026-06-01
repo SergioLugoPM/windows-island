@@ -173,6 +173,11 @@ impl IpcClient {
 
         Ok(config)
     }
+
+    /// Refresh the cached theme config from shared memory
+    pub fn refresh_theme(&self) -> Result<ThemeConfig, String> {
+        self.read_theme_config()
+    }
 }
 
 impl Drop for IpcClient {

@@ -14,6 +14,25 @@
 use crate::iat_patcher::{patch_iat_for_get_sys_color, unpatch_iat, ORIGINAL_GET_SYS_COLOR};
 use crate::message_handler;
 use crate::theme_handler::DARK_THEME_COLORS;
+use std::sync::Mutex;
+use lazy_static::lazy_static;
+use crate::ipc_client::ThemeConfig;
+
+lazy_static! {
+    static ref CACHED_THEME_CONFIG: Mutex<Option<ThemeConfig>> = Mutex::new(None);
+}
+
+/// Update the cached theme config from IPC
+pub fn update_cached_theme(config: ThemeConfig) {
+    if let Ok(mut cache) = CACHED_THEME_CONFIG.lock() {
+        *cache = Some(config);
+    }
+}
+
+/// Get the current cached theme config
+pub fn get_cached_theme() -> Option<ThemeConfig> {
+    CACHED_THEME_CONFIG.lock().ok().and_then(|c| *c)
+}
 
 // ---------------------------------------------------------------------------
 // Public hook entry-point
@@ -63,10 +82,25 @@ pub unsafe extern "system" fn hooked_get_sys_color(n_index: i32) -> u32 {
 /// short (fewer than 20 entries) so the overhead is negligible compared with
 /// the cost of the Win32 FFI call it avoids.
 pub fn get_override_color(color_index: i32) -> Option<u32> {
-    DARK_THEME_COLORS
-        .iter()
-        .find(|&&(idx, _)| idx == color_index)
-        .map(|&(_, color)| color)
+    // First try cached theme config from IPC
+    if let Some(theme) = get_cached_theme() {
+        // Map color indices to RGB from theme struct
+        match color_index {
+            0 => Some(((theme.foreground_rgb[0] as u32) << 16) |
+                     ((theme.foreground_rgb[1] as u32) << 8) |
+                     (theme.foreground_rgb[2] as u32)),
+            3 | 12 => Some(((theme.background_rgb[0] as u32) << 16) |
+                          ((theme.background_rgb[1] as u32) << 8) |
+                          (theme.background_rgb[2] as u32)),
+            _ => None,
+        }
+    } else {
+        // Fall back to static DARK_THEME_COLORS
+        DARK_THEME_COLORS
+            .iter()
+            .find(|&&(idx, _)| idx == color_index)
+            .map(|&(_, color)| color)
+    }
 }
 
 // ---------------------------------------------------------------------------
