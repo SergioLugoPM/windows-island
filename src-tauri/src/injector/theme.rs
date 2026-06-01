@@ -181,7 +181,7 @@ impl Drop for ThemeManager {
             if !self.view_address.Value.is_null() {
                 let _ = UnmapViewOfFile(self.view_address);
             }
-            if self.mapping_handle != INVALID_HANDLE_VALUE {
+            if !self.mapping_handle.is_invalid() {
                 let _ = CloseHandle(self.mapping_handle);
             }
         }
