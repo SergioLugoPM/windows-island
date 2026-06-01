@@ -6,6 +6,7 @@ pub mod hook_procedures;
 pub mod ipc_client;
 pub mod iat_patcher;
 pub mod message_handler;
+pub mod pe_parser;
 
 use theme_handler::ThemeHandler;
 use ipc_client::IpcClient;
