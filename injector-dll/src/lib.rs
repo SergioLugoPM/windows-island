@@ -1,7 +1,5 @@
 use std::sync::OnceLock;
-use windows::Win32::Foundation::{HINSTANCE, BOOL, TRUE, FALSE, CloseHandle};
-use windows::Win32::System::Memory::{OpenFileMappingA, MapViewOfFile, UnmapViewOfFile, FILE_MAP_READ};
-use windows::core::PCSTR;
+use windows::Win32::Foundation::{HINSTANCE, BOOL, TRUE, FALSE};
 
 pub mod theme_handler;
 pub mod hook_procedures;
@@ -39,7 +37,6 @@ fn get_ipc_client() -> Option<&'static IpcClient> {
     }
     IPC_CLIENT.get()
 }
-
 
 #[no_mangle]
 pub extern "system" fn DllMain(
