@@ -1,6 +1,19 @@
+use std::sync::OnceLock;
 use windows::Win32::Foundation::{HINSTANCE, BOOL, TRUE, FALSE, CloseHandle};
 use windows::Win32::System::Memory::{OpenFileMappingA, MapViewOfFile, UnmapViewOfFile, FILE_MAP_READ};
 use windows::core::PCSTR;
+
+pub mod theme_handler;
+pub mod hook_procedures;
+pub mod ipc_client;
+
+use theme_handler::ThemeHandler;
+
+static THEME_HANDLER: OnceLock<ThemeHandler> = OnceLock::new();
+
+fn get_theme_handler() -> &'static ThemeHandler {
+    THEME_HANDLER.get_or_init(ThemeHandler::new)
+}
 
 // Match the Rust InjectedTheme struct (from Task 2)
 // Note: Using u8 for bools to ensure C-compatible binary layout
@@ -24,6 +37,12 @@ pub extern "system" fn DllMain(
 ) -> BOOL {
     match call_reason {
         1 => { // DLL_PROCESS_ATTACH
+            // Initialize theme handler
+            let _ = get_theme_handler();
+
+            // Initialize hooks (implemented in Task 2)
+            // initialize_hooks();
+
             unsafe {
                 on_dll_attach();
             }
