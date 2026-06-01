@@ -98,8 +98,11 @@ impl Injector {
 
             // Write DLL path to target process
             let mut bytes_written = 0;
-            WriteProcessMemory(h_process, remote_mem, dll_bytes.as_ptr() as *const _, dll_bytes.len(), Some(&mut bytes_written))
-                .map_err(|_| InjectorError::WriteFailed)?;
+            if let Err(_) = WriteProcessMemory(h_process, remote_mem, dll_bytes.as_ptr() as *const _, dll_bytes.len(), Some(&mut bytes_written)) {
+                let _ = VirtualFreeEx(h_process, remote_mem, 0, MEM_RELEASE);
+                let _ = CloseHandle(h_process);
+                return Err(InjectorError::WriteFailed);
+            }
 
             if bytes_written != dll_bytes.len() {
                 let _ = VirtualFreeEx(h_process, remote_mem, 0, MEM_RELEASE);
@@ -111,6 +114,7 @@ impl Injector {
             let kernel32 = match GetModuleHandleW(windows::core::w!("kernel32.dll")) {
                 Ok(h) => h,
                 Err(_) => {
+                    let _ = VirtualFreeEx(h_process, remote_mem, 0, MEM_RELEASE);
                     let _ = CloseHandle(h_process);
                     return Err(InjectorError::CreateThreadFailed);
                 }
@@ -118,6 +122,7 @@ impl Injector {
             let load_library_a = match GetProcAddress(kernel32, windows::core::s!("LoadLibraryA")) {
                 Some(addr) => addr as *mut (),
                 None => {
+                    let _ = VirtualFreeEx(h_process, remote_mem, 0, MEM_RELEASE);
                     let _ = CloseHandle(h_process);
                     return Err(InjectorError::CreateThreadFailed);
                 }
