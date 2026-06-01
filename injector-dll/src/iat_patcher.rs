@@ -23,6 +23,8 @@ use std::mem;
 use windows::core::PCSTR;
 use windows::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
 
+use crate::pe_parser;
+
 // ---------------------------------------------------------------------------
 // Static storage for the original function pointer
 // ---------------------------------------------------------------------------
@@ -38,6 +40,10 @@ use windows::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
 /// from within `DllMain`) or when it is guaranteed that no other thread is
 /// concurrently accessing the DLL hook path.
 pub static mut ORIGINAL_GET_SYS_COLOR: Option<unsafe extern "system" fn(i32) -> u32> = None;
+
+/// `true` while the IAT entry for GetSysColor has been overwritten with
+/// our hook. Used by `unpatch_iat` to decide whether to restore.
+pub static mut IAT_PATCHED: bool = false;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -60,38 +66,38 @@ pub static mut ORIGINAL_GET_SYS_COLOR: Option<unsafe extern "system" fn(i32) -> 
 /// Win32 calls are wrapped in `unsafe` blocks; the function itself is safe
 /// to call from `DllMain`.
 pub fn patch_iat_for_get_sys_color(
-    _hooked_fn: unsafe extern "system" fn(i32) -> u32,
+    hooked_fn: unsafe extern "system" fn(i32) -> u32,
 ) -> Result<(), String> {
     unsafe {
-        // ----------------------------------------------------------------
-        // 1. Obtain a handle to user32.dll.
-        //    We use GetModuleHandleA (not LoadLibraryA) because user32.dll
-        //    is always loaded before any injected DLL fires DllMain, so we
-        //    do not need to increment its reference count.
-        // ----------------------------------------------------------------
+        // A. Store the original GetSysColor pointer for hooked_get_sys_color
+        //    call-through (fallback when IAT patch is not active).
         let user32_name = PCSTR::from_raw(b"user32.dll\0".as_ptr());
-
         let h_user32 = GetModuleHandleA(user32_name)
             .map_err(|e| format!("GetModuleHandleA(\"user32.dll\") failed: {e}"))?;
 
-        // ----------------------------------------------------------------
-        // 2. Resolve the exported symbol "GetSysColor".
-        // ----------------------------------------------------------------
         let proc_name = PCSTR::from_raw(b"GetSysColor\0".as_ptr());
-
         let raw_proc = GetProcAddress(h_user32, proc_name)
             .ok_or_else(|| "GetProcAddress(\"GetSysColor\") returned null".to_string())?;
 
-        // ----------------------------------------------------------------
-        // 3. Transmute the opaque FARPROC to the typed function pointer.
-        //    SAFETY: We looked up "GetSysColor" from user32.dll, which is
-        //    documented to have the signature `DWORD WINAPI GetSysColor(int)`.
-        //    The `extern "system"` + `fn(i32) -> u32` type matches that ABI
-        //    exactly on both x86 and x86-64 Windows targets.
-        // ----------------------------------------------------------------
-        let typed_fn: unsafe extern "system" fn(i32) -> u32 = mem::transmute(raw_proc);
+        ORIGINAL_GET_SYS_COLOR = Some(mem::transmute(raw_proc));
 
-        ORIGINAL_GET_SYS_COLOR = Some(typed_fn);
+        // B. Patch the IAT so every call to GetSysColor inside Explorer.exe
+        //    goes through our hook instead of the real implementation.
+        match pe_parser::find_and_patch_iat(
+            b"user32.dll",
+            b"GetSysColor",
+            hooked_fn as usize,
+        ) {
+            Ok(_original_addr) => {
+                IAT_PATCHED = true;
+            }
+            Err(e) => {
+                // Non-fatal: hook call-through still works via
+                // ORIGINAL_GET_SYS_COLOR; Explorer calls just won't be
+                // intercepted at the IAT level.
+                let _ = format!("[windows-island] IAT patch skipped: {e}");
+            }
+        }
     }
 
     Ok(())
@@ -109,9 +115,25 @@ pub fn patch_iat_for_get_sys_color(
 /// Phase 4 logic (which will need to restore the original IAT entry) to surface
 /// errors without a breaking signature change.
 pub fn unpatch_iat() -> Result<(), String> {
-    // SAFETY: Called only from DllMain under the loader lock — no concurrent
-    // hook invocations can be in flight at this point.
     unsafe {
+        if IAT_PATCHED {
+            if let Some(orig_fn) = ORIGINAL_GET_SYS_COLOR {
+                // Walk the IAT again and write the original address back.
+                match pe_parser::find_and_patch_iat(
+                    b"user32.dll",
+                    b"GetSysColor",
+                    orig_fn as usize,
+                ) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        // Do not panic — we must still clear statics.
+                        let _ = format!("[windows-island] IAT restore failed: {e}");
+                    }
+                }
+            }
+            IAT_PATCHED = false;
+        }
+
         ORIGINAL_GET_SYS_COLOR = None;
     }
     Ok(())
