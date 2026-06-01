@@ -39,6 +39,21 @@ fn get_ipc_client() -> Option<&'static IpcClient> {
     IPC_CLIENT.get()
 }
 
+/// Read the current theme config from the host IPC server and populate the
+/// hook's cached config.
+///
+/// Called once on DLL load so the taskbar receives the correct colors on the
+/// first injection.  If the IPC client is unavailable or the read fails, this
+/// is a no-op and the hook falls back to static defaults.
+fn initialize_theme_from_ipc() {
+    if let Some(ipc_client) = get_ipc_client() {
+        if let Ok(config) = ipc_client.read_theme_config() {
+            // Update the cached theme in hook procedures
+            hook_procedures::update_cached_theme(config);
+        }
+    }
+}
+
 #[no_mangle]
 pub extern "system" fn DllMain(
     _module: HINSTANCE,
@@ -54,6 +69,10 @@ pub extern "system" fn DllMain(
             // This may return None if the host mapping is not yet available;
             // that is non-fatal — the hook will fall back to static defaults.
             let _ = get_ipc_client();
+
+            // Initialize theme from IPC on load so the taskbar gets the
+            // correct colors on the first injection.
+            initialize_theme_from_ipc();
 
             // Install GetSysColor hook
             if let Err(e) = hook_procedures::install_hooks() {
