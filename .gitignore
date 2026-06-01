@@ -29,6 +29,9 @@ Thumbs.db
 src-tauri/target/
 src-tauri/gen/schemas
 
+# Injector DLL build outputs
+injector-dll/target/
+
 # Source images (kept locally only)
 icon_source.png
 
