@@ -12,6 +12,7 @@
 //! task once the detour library is chosen.
 
 use crate::iat_patcher::{patch_iat_for_get_sys_color, unpatch_iat, ORIGINAL_GET_SYS_COLOR};
+use crate::message_handler;
 use crate::theme_handler::DARK_THEME_COLORS;
 
 // ---------------------------------------------------------------------------
@@ -82,7 +83,12 @@ pub fn get_override_color(color_index: i32) -> Option<u32> {
 /// table of the host executable) is deferred to **Phase 4** once the
 /// IAT-patching engine is implemented.
 pub fn install_hooks() -> Result<(), String> {
-    patch_iat_for_get_sys_color(hooked_get_sys_color)
+    patch_iat_for_get_sys_color(hooked_get_sys_color)?;
+
+    // Install message hook for window events
+    message_handler::install_message_hook()?;
+
+    Ok(())
 }
 
 /// Remove the `GetSysColor` hook and restore the original function pointer.
@@ -94,7 +100,11 @@ pub fn install_hooks() -> Result<(), String> {
 /// Full IAT restoration (writing the original pointer back into the PE import
 /// table) is deferred to **Phase 4**.
 pub fn uninstall_hooks() -> Result<(), String> {
-    unpatch_iat()
+    unpatch_iat()?;
+
+    message_handler::uninstall_message_hook()?;
+
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
