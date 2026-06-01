@@ -33,7 +33,7 @@ impl InjectedTheme {
         Self {
             primary_rgb: [20, 20, 25],
             accent_rgb: [100, 180, 255],
-            transparency: 0.85,
+            transparency: 0.95,
             border_iridescence: false,
             background_rgb: [15, 15, 20],
             foreground_rgb: [240, 240, 255],
@@ -47,7 +47,7 @@ impl InjectedTheme {
         Self {
             primary_rgb: [245, 245, 250],
             accent_rgb: [100, 150, 220],
-            transparency: 0.9,
+            transparency: 0.92,
             border_iridescence: false,
             background_rgb: [255, 255, 255],
             foreground_rgb: [30, 30, 40],
