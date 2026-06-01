@@ -136,11 +136,18 @@ pub unsafe fn find_and_patch_iat(
         .map_err(|e| format!("GetModuleHandleW failed: {e}"))?
         .0 as *const u8;
 
+    // SAFETY: GetModuleHandleW(None) returns the base address of the current
+    // process's main module, which is always a valid mapped PE image.
     let dos = &*(base as *const ImageDosHeader);
     if dos.e_magic != 0x5A4D {
         return Err("Invalid DOS magic (expected MZ / 0x5A4D)".into());
     }
+    if dos.e_lfanew <= 0 {
+        return Err(format!("Invalid e_lfanew value: {}", dos.e_lfanew));
+    }
 
+    // SAFETY: e_lfanew is validated positive above; PE images are always
+    // mapped with their headers accessible.
     let nt = &*(base.add(dos.e_lfanew as usize) as *const ImageNtHeaders64);
     if nt.signature != 0x0000_4550 {
         return Err("Invalid PE signature (expected PE\\0\\0 / 0x00004550)".into());
@@ -154,6 +161,8 @@ pub unsafe fn find_and_patch_iat(
     let mut desc = base.add(import_dir.virtual_address as usize)
         as *const ImageImportDescriptor;
 
+    // SAFETY: desc/ilt/iat point within the mapped PE image; loop terminates
+    // at the null-entry sentinel.
     while (*desc).name != 0 {
         let dll_ptr = base.add((*desc).name as usize) as *const i8;
         let dll_bytes = CStr::from_ptr(dll_ptr).to_bytes();
@@ -164,21 +173,32 @@ pub unsafe fn find_and_patch_iat(
                 .all(|(a, b)| a.to_ascii_lowercase() == b.to_ascii_lowercase());
 
         if dll_match {
-            let ilt = base.add((*desc).original_first_thunk as usize)
-                as *const ImageThunkData64;
+            let ilt_rva = (*desc).original_first_thunk;
             let iat = base.add((*desc).first_thunk as usize)
                 as *mut ImageThunkData64;
+            let ilt = if ilt_rva != 0 {
+                base.add(ilt_rva as usize) as *const ImageThunkData64
+            } else {
+                // ILT was stripped by linker; fall back to IAT as name source (read-only walk)
+                iat as *const ImageThunkData64
+            };
 
             let mut i = 0usize;
+            // SAFETY: desc/ilt/iat point within the mapped PE image; loop terminates
+            // at the null-entry sentinel.
             while (*ilt.add(i)).address_or_rva != 0 {
                 let ilt_val = (*ilt.add(i)).address_or_rva;
 
                 if ilt_val & (1u64 << 63) == 0 {
+                    // SAFETY: desc/ilt/iat point within the mapped PE image; loop terminates
+                    // at the null-entry sentinel.
                     let ibn = base.add(ilt_val as usize) as *const ImageImportByName;
                     let func_bytes =
                         CStr::from_ptr((*ibn).name.as_ptr() as *const i8).to_bytes();
 
                     if func_bytes == target_func {
+                        // SAFETY: desc/ilt/iat point within the mapped PE image; loop terminates
+                        // at the null-entry sentinel.
                         let iat_slot = &mut (*iat.add(i)).address_or_rva as *mut u64
                             as *mut usize;
 
@@ -194,13 +214,20 @@ pub unsafe fn find_and_patch_iat(
                         let original = *iat_slot;
                         *iat_slot = hook_fn;
 
-                        VirtualProtect(
+                        // Restore page protection; failure is non-fatal (page stays writable)
+                        // but should be visible in debug builds.
+                        if VirtualProtect(
                             iat_slot as *mut _,
                             size_of::<usize>(),
                             old_prot,
                             &mut old_prot,
                         )
-                        .ok();
+                        .is_err()
+                        {
+                            let _ = format!(
+                                "[windows-island] Warning: failed to restore IAT page protection"
+                            );
+                        }
 
                         return Ok(original);
                     }
