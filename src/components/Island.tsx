@@ -278,6 +278,16 @@ export function Island() {
             setLiq(0.65);
             await resizeToMode("peek", settings.clockSize, settings.positionMode);
             setMode("peek");
+            // Safety net: if mouseenter/mouseleave never fire (cursor moved away
+            // before the island appeared, or GetCursorPos false-positive),
+            // collapse automatically after 4 s so the island doesn't stay stuck.
+            clearTimeout(collapseTimer.current);
+            collapseTimer.current = setTimeout(() => {
+              resizeToMode("idle", settings.clockSize, settings.positionMode);
+              setMode("idle");
+              setOpacity(0.72);
+              setLiq(0.4);
+            }, 4000);
           }, 80);
 
         } else if (!atEdge && !passthrough && !expanding) {

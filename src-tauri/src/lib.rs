@@ -90,7 +90,11 @@ mod win_sys {
 
     pub fn cursor_pos() -> (i32, i32) {
         let mut pt = POINT { x: 0, y: 0 };
-        unsafe { GetCursorPos(&mut pt); }
+        // GetCursorPos returns 0 on failure (e.g. no desktop access).
+        // Return a sentinel cy = i32::MAX so the edge-detection threshold
+        // (cy < 8–12 px) is never falsely triggered.
+        let ok = unsafe { GetCursorPos(&mut pt) };
+        if ok == 0 { return (0, i32::MAX); }
         (pt.x, pt.y)
     }
 
