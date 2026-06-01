@@ -1,5 +1,6 @@
 pub mod cpu_temp;
 pub mod i18n;
+pub mod injection;
 pub mod injector;
 pub mod media;
 pub mod stats;
@@ -11,6 +12,38 @@ use std::{
 };
 use tauri::{Manager, State};
 use crate::injector::{Injector, theme::ThemeManager};
+use crate::injection::{IpcServer, IpcThemeConfig};
+
+// ─── IPC Server (theme config shared memory) ─────────────────────────────────
+//
+// `OnceLock::get_or_try_init` is not yet stable (tracking issue #109737).
+// Instead we keep the server in a `Mutex<Option<IpcServer>>` and initialise
+// it once, the first time any code calls `with_ipc_server`.
+
+static IPC_SERVER: Mutex<Option<IpcServer>> = Mutex::new(None);
+
+/// Initialise the IPC server on first call and call `f` with a reference.
+/// Subsequent calls reuse the already-initialised server.
+fn with_ipc_server<F, T>(f: F) -> Result<T, String>
+where
+    F: FnOnce(&IpcServer) -> Result<T, String>,
+{
+    let mut guard = IPC_SERVER
+        .lock()
+        .map_err(|e| format!("IPC server mutex poisoned: {}", e))?;
+    if guard.is_none() {
+        *guard = Some(
+            IpcServer::new().map_err(|e| format!("IPC server init failed: {}", e))?,
+        );
+    }
+    f(guard.as_ref().unwrap())
+}
+
+/// Attempt to initialise the IPC server without returning the guard.
+/// Used in the setup phase where we only want the side-effect of creation.
+fn init_ipc_server() -> Result<(), String> {
+    with_ipc_server(|_| Ok(()))
+}
 
 // ─── Raw Win32 FFI ─────────────────────────────────────────────────────────────
 
@@ -279,6 +312,20 @@ fn set_locale(state: State<'_, AppState>, locale: String) {
     state.i18n.lock().unwrap().set_locale(&locale);
 }
 
+/// Push a theme configuration to the injected DLL via the IPC shared memory.
+///
+/// Accepted `config_name` values: `"dark"`, `"light"`.
+/// Returns `Err` for unknown names or if the IPC server fails to initialise.
+#[tauri::command]
+fn update_injected_theme(config_name: String) -> Result<(), String> {
+    let config = match config_name.as_str() {
+        "dark" => IpcThemeConfig::dark_theme(),
+        "light" => IpcThemeConfig::light_theme(),
+        _ => return Err(format!("Unknown theme '{}'; expected 'dark' or 'light'", config_name)),
+    };
+    with_ipc_server(|server| server.update_config(config))
+}
+
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -318,6 +365,12 @@ pub fn run() {
             injection_active,
         })
         .setup(|app| {
+            // ── IPC server init (shared memory for DLL theme config) ──────────
+            // Initialise early so the mapping exists before the DLL is injected.
+            if let Err(e) = init_ipc_server() {
+                eprintln!("[IPC] Warning: could not start IPC server: {}", e);
+            }
+
             let win = app.get_webview_window("main").unwrap();
             win.set_always_on_top(true)?;
 
@@ -404,6 +457,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            update_injected_theme,
             enable_theme_injection,
             disable_theme_injection,
             is_injection_active,
