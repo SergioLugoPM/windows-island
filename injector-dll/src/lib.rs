@@ -64,42 +64,15 @@ pub extern "system" fn DllMain(
                 let _ = e; // TODO: surface via IPC once ipc_client is implemented
             }
 
-            unsafe {
-                on_dll_attach();
-            }
             TRUE
         }
         0 => { // DLL_PROCESS_DETACH
             // Restore original GetSysColor before we unload
             let _ = hook_procedures::uninstall_hooks();
 
-            unsafe {
-                on_dll_detach();
-            }
             TRUE
         }
         _ => FALSE,
     }
 }
 
-unsafe fn on_dll_attach() {
-    // Try to read theme from shared memory
-    let mapping_name = PCSTR::from_raw(b"Local\\WindowsIsland_Theme_v1\0".as_ptr());
-
-    if let Ok(h_mapping) = OpenFileMappingA(FILE_MAP_READ.0, false, mapping_name) {
-        let view = MapViewOfFile(h_mapping, FILE_MAP_READ, 0, 0, std::mem::size_of::<InjectedTheme>());
-        if !view.Value.is_null() {
-            let theme_ptr = view.Value as *const InjectedTheme;
-            let theme = std::ptr::read(theme_ptr);
-            // TODO: Log theme data or install hooks
-            // For Phase 1, just verify we can read it
-            let _ = theme.version;
-            let _ = UnmapViewOfFile(view);
-        }
-        let _ = CloseHandle(h_mapping);
-    }
-}
-
-unsafe fn on_dll_detach() {
-    // Cleanup hooks (Phase 2)
-}
