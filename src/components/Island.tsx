@@ -413,6 +413,27 @@ export function Island() {
   const setTheme        = (v: Theme)        => setSettings(s => ({ ...s, theme: v }));
   const setClockSize    = (v: ClockSize)    => setSettings(s => ({ ...s, clockSize: v }));
 
+  // ── Theme change handler (injection) ──
+  // Centralizes theme selection so the injected DLL gets refreshed live.
+  // The Rust `update_injected_theme` command only accepts "dark" | "light";
+  // "vidrio" maps to the dark config for IPC purposes.
+  const handleThemeChange = async (newTheme: 'dark' | 'light' | 'vidrio') => {
+    setSelectedTheme(newTheme);
+
+    if (injectionActive) {
+      try {
+        const configName = newTheme === 'vidrio' ? 'dark' : newTheme;
+        // Update the theme in the IPC server
+        await invoke('update_injected_theme', { configName });
+        // Signal the DLL to refresh its cached config
+        await invoke('refresh_injected_theme_config');
+      } catch (error) {
+        console.error('Failed to update theme:', error);
+        alert('Failed to update theme');
+      }
+    }
+  };
+
   // ── Theme injection handler ──
   const handleToggleInjection = async () => {
     if (!isTauri) return;
@@ -661,7 +682,7 @@ export function Island() {
                               name="injectionTheme"
                               value={theme}
                               checked={selectedTheme === theme}
-                              onChange={(e) => { e.stopPropagation(); setSelectedTheme(theme); }}
+                              onChange={(e) => { e.stopPropagation(); handleThemeChange(theme); }}
                               disabled={injectionLoading}
                               style={{ transform: 'scale(0.8)' }}
                             />

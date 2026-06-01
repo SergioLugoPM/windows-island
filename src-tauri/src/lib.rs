@@ -326,6 +326,16 @@ fn update_injected_theme(config_name: String) -> Result<(), String> {
     with_ipc_server(|server| server.update_config(config))
 }
 
+/// Signal the injected DLL to re-read the IPC config.
+///
+/// In a future phase, this could use a pipe / event to wake the DLL.
+/// For now it is a placeholder that returns success so the frontend can
+/// complete the "theme change → IPC update → DLL refresh" loop.
+#[tauri::command]
+fn refresh_injected_theme_config() -> Result<(), String> {
+    Ok(())
+}
+
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -458,6 +468,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             update_injected_theme,
+            refresh_injected_theme_config,
             enable_theme_injection,
             disable_theme_injection,
             is_injection_active,
