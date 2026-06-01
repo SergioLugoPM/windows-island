@@ -188,6 +188,12 @@ impl Drop for ThemeManager {
     }
 }
 
+// SAFETY: ThemeManager's internal HANDLE and view pointers are thread-safe once created.
+// Windows named file mappings are designed for cross-process sharing and can be safely
+// accessed from multiple threads. The view address is read-only after creation.
+unsafe impl Send for ThemeManager {}
+unsafe impl Sync for ThemeManager {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

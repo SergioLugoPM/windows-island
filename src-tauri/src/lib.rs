@@ -6,10 +6,11 @@ pub mod stats;
 pub mod weather;
 
 use std::{
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, atomic::AtomicBool},
     time::Instant,
 };
 use tauri::{Manager, State};
+use crate::injector::{Injector, theme::ThemeManager};
 
 // ─── Raw Win32 FFI ─────────────────────────────────────────────────────────────
 
@@ -83,11 +84,13 @@ mod win_sys {
 
 // ─── App state ────────────────────────────────────────────────────────────────
 
-#[derive(Default)]
 pub struct AppState {
     weather_cache: Arc<Mutex<Option<(weather::WeatherInfo, Instant)>>>,
     stats: Arc<stats::StatsState>,
     pub i18n: Arc<Mutex<i18n::I18n>>,
+    pub injector: Arc<Injector>,
+    pub theme_manager: Arc<Mutex<ThemeManager>>,
+    pub injection_active: Arc<AtomicBool>,
 }
 
 // ─── Tauri commands ───────────────────────────────────────────────────────────
@@ -239,8 +242,34 @@ pub fn run() {
         return; // another instance is running — exit silently
     }
 
+    // Get or compute DLL path
+    let dll_path = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        .map(|p| p.join("windows_island_injector_dll.dll"))
+        .unwrap_or_else(|| "windows_island_injector_dll.dll".into());
+
+    // Create injector
+    let injector = Arc::new(Injector::new(dll_path));
+
+    // Create theme manager
+    let theme_manager = Arc::new(Mutex::new(
+        ThemeManager::new()
+            .expect("Failed to initialize theme manager")
+    ));
+
+    // Atomic bool for injection state
+    let injection_active = Arc::new(AtomicBool::new(false));
+
     tauri::Builder::default()
-        .manage(AppState::default())
+        .manage(AppState {
+            weather_cache: Arc::new(Mutex::new(None)),
+            stats: Arc::new(stats::StatsState::default()),
+            i18n: Arc::new(Mutex::new(i18n::I18n::default())),
+            injector,
+            theme_manager,
+            injection_active,
+        })
         .setup(|app| {
             let win = app.get_webview_window("main").unwrap();
             win.set_always_on_top(true)?;
