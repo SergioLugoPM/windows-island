@@ -5,14 +5,14 @@
 
 use std::ffi::CString;
 use std::path::PathBuf;
-use std::ptr;
-use windows::Win32::System::ProcessStatus::K32EnumProcesses;
 use windows::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32, TH32CS_SNAPPROCESS,
 };
-use windows::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE, WAIT_OBJECT_0};
-use windows::Win32::System::Memory::{VirtualAllocEx, WriteProcessMemory, VirtualFreeEx, MEM_COMMIT, MEM_RELEASE, PAGE_READWRITE};
-use windows::Win32::System::Threading::{CreateRemoteThread, WaitForSingleObject, GetCurrentProcess, OpenProcess, CloseHandle, PROCESS_ALL_ACCESS};
+use windows::Win32::Foundation::CloseHandle;
+use windows::Win32::System::Memory::{VirtualAllocEx, VirtualFreeEx, MEM_COMMIT, MEM_RELEASE, PAGE_READWRITE};
+use windows::Win32::System::Diagnostics::Debug::WriteProcessMemory;
+use windows::Win32::System::Threading::{CreateRemoteThread, WaitForSingleObject, OpenProcess, PROCESS_ALL_ACCESS};
+use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
 
 pub struct Injector {
     dll_path: PathBuf,
@@ -35,16 +35,13 @@ impl Injector {
 
     /// Inject DLL into Explorer.exe (taskbar)
     pub fn inject_into_explorer(&self) -> Result<(), InjectorError> {
-        self.inject_into_process("explorer.exe")
+        let pid = self.find_process_by_name("explorer.exe")?;
+        self.inject_into_pid(pid)
     }
 
     /// Inject DLL into StartMenuExperienceHost.exe (Win11 Start Menu)
     pub fn inject_into_startmenu(&self) -> Result<(), InjectorError> {
-        self.inject_into_process("StartMenuExperienceHost.exe")
-    }
-
-    fn inject_into_process(&self, process_name: &str) -> Result<(), InjectorError> {
-        let pid = self.find_process_by_name(process_name)?;
+        let pid = self.find_process_by_name("StartMenuExperienceHost.exe")?;
         self.inject_into_pid(pid)
     }
 
@@ -58,20 +55,20 @@ impl Injector {
                 ..Default::default()
             };
 
-            if Process32First(snapshot, &mut entry).as_bool() {
+            if Process32First(snapshot, &mut entry).is_ok() {
                 loop {
                     let exe_name = std::ffi::CStr::from_ptr(entry.szExeFile.as_ptr() as *const i8)
                         .to_string_lossy();
                     if exe_name.eq_ignore_ascii_case(name) {
-                        let _ = windows::Win32::Foundation::CloseHandle(snapshot);
+                        let _ = CloseHandle(snapshot);
                         return Ok(entry.th32ProcessID);
                     }
-                    if !Process32Next(snapshot, &mut entry).as_bool() {
+                    if Process32Next(snapshot, &mut entry).is_err() {
                         break;
                     }
                 }
             }
-            let _ = windows::Win32::Foundation::CloseHandle(snapshot);
+            let _ = CloseHandle(snapshot);
         }
         Err(InjectorError::ProcessNotFound(name.to_string()))
     }
@@ -93,8 +90,11 @@ impl Injector {
             let dll_bytes = dll_cstring.as_bytes_with_nul();
 
             // Allocate memory in target process
-            let remote_mem = VirtualAllocEx(h_process, None, dll_bytes.len(), MEM_COMMIT, PAGE_READWRITE)
-                .ok_or(InjectorError::AllocFailed)?;
+            let remote_mem = VirtualAllocEx(h_process, None, dll_bytes.len(), MEM_COMMIT, PAGE_READWRITE);
+            if remote_mem.is_null() {
+                let _ = CloseHandle(h_process);
+                return Err(InjectorError::AllocFailed);
+            }
 
             // Write DLL path to target process
             let mut bytes_written = 0;
@@ -107,11 +107,24 @@ impl Injector {
                 return Err(InjectorError::WriteFailed);
             }
 
-            // Get LoadLibraryA address
-            let load_library_a = windows::Win32::System::LibraryLoader::LoadLibraryA as *mut ();
+            // Get LoadLibraryA address from kernel32.dll
+            let kernel32 = match GetModuleHandleW(windows::core::w!("kernel32.dll")) {
+                Ok(h) => h,
+                Err(_) => {
+                    let _ = CloseHandle(h_process);
+                    return Err(InjectorError::CreateThreadFailed);
+                }
+            };
+            let load_library_a = match GetProcAddress(kernel32, windows::core::s!("LoadLibraryA")) {
+                Some(addr) => addr as *mut (),
+                None => {
+                    let _ = CloseHandle(h_process);
+                    return Err(InjectorError::CreateThreadFailed);
+                }
+            };
 
             // Create remote thread to call LoadLibraryA(remote_mem)
-            let h_thread = CreateRemoteThread(
+            let h_thread = match CreateRemoteThread(
                 h_process,
                 None,
                 0,
@@ -119,13 +132,14 @@ impl Injector {
                 Some(remote_mem),
                 0,
                 None,
-            );
-
-            if h_thread.is_invalid() {
-                let _ = VirtualFreeEx(h_process, remote_mem, 0, MEM_RELEASE);
-                let _ = CloseHandle(h_process);
-                return Err(InjectorError::CreateThreadFailed);
-            }
+            ) {
+                Ok(handle) => handle,
+                Err(_) => {
+                    let _ = VirtualFreeEx(h_process, remote_mem, 0, MEM_RELEASE);
+                    let _ = CloseHandle(h_process);
+                    return Err(InjectorError::CreateThreadFailed);
+                }
+            };
 
             // Wait for thread to complete (max 5 seconds)
             let _ = WaitForSingleObject(h_thread, 5000);
