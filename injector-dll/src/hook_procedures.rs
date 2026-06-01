@@ -11,9 +11,7 @@
 //! wired to an actual IAT/inline hooking engine; that wiring happens in a later
 //! task once the detour library is chosen.
 
-use windows::Win32::Graphics::Gdi::GetSysColor as OrigGetSysColor;
-use windows::Win32::Graphics::Gdi::SYS_COLOR_INDEX;
-
+use crate::iat_patcher::{patch_iat_for_get_sys_color, unpatch_iat, ORIGINAL_GET_SYS_COLOR};
 use crate::theme_handler::DARK_THEME_COLORS;
 
 // ---------------------------------------------------------------------------
@@ -36,16 +34,21 @@ use crate::theme_handler::DARK_THEME_COLORS;
 ///   process that has already loaded user32.dll).
 #[no_mangle]
 pub unsafe extern "system" fn hooked_get_sys_color(n_index: i32) -> u32 {
-    // Check our dark-theme override table first.
+    // 1. Check our dark-theme override table first.
     if let Some(override_color) = get_override_color(n_index) {
         return override_color;
     }
 
-    // No override — delegate to the real Win32 function.
-    // SAFETY: SYS_COLOR_INDEX is a transparent newtype over i32, so the
-    // bit-pattern conversion is always valid.  The original function is a
-    // standard Win32 API that is safe to call from any Windows thread.
-    OrigGetSysColor(SYS_COLOR_INDEX(n_index))
+    // 2. No override — call through to the real GetSysColor via the stored
+    //    original pointer retrieved by patch_iat_for_get_sys_color().
+    if let Some(orig_fn) = ORIGINAL_GET_SYS_COLOR {
+        return (orig_fn)(n_index);
+    }
+
+    // 3. Fallback: original pointer not yet set (e.g. hook fired before
+    //    patch_iat_for_get_sys_color ran). Return a neutral dark colour so
+    //    the UI does not show an obviously broken white colour.
+    0x1a1a1a
 }
 
 // ---------------------------------------------------------------------------
@@ -71,24 +74,27 @@ pub fn get_override_color(color_index: i32) -> Option<u32> {
 
 /// Install the `GetSysColor` hook into the host process.
 ///
-/// Currently a stub: returns `Ok(())` immediately.  In the next task this
-/// will be replaced by actual IAT-patch or inline-detour logic using a
-/// hooking library (e.g. `detours-sys` or `minhook`).
+/// Phase 3: resolves the original `GetSysColor` symbol from user32.dll and
+/// stores it in [`ORIGINAL_GET_SYS_COLOR`] so that `hooked_get_sys_color`
+/// can call through to the real implementation.
+///
+/// Full IAT patching (writing the replacement pointer into the PE import
+/// table of the host executable) is deferred to **Phase 4** once the
+/// IAT-patching engine is implemented.
 pub fn install_hooks() -> Result<(), String> {
-    // TODO (Phase 2, next task): patch the Import Address Table of the host
-    // process so that calls to GetSysColor are redirected to
-    // `hooked_get_sys_color`.
-    Ok(())
+    patch_iat_for_get_sys_color(hooked_get_sys_color)
 }
 
 /// Remove the `GetSysColor` hook and restore the original function pointer.
 ///
-/// Currently a stub: returns `Ok(())` immediately.  Must be called before
-/// the DLL is unloaded to avoid a dangling function pointer in the IAT.
+/// Phase 3: clears [`ORIGINAL_GET_SYS_COLOR`] so the hook stub falls back
+/// to the safe dark-colour constant rather than calling through a potentially
+/// stale pointer.
+///
+/// Full IAT restoration (writing the original pointer back into the PE import
+/// table) is deferred to **Phase 4**.
 pub fn uninstall_hooks() -> Result<(), String> {
-    // TODO (Phase 2, next task): restore the original GetSysColor pointer in
-    // the host process's IAT.
-    Ok(())
+    unpatch_iat()
 }
 
 // ---------------------------------------------------------------------------

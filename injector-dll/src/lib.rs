@@ -6,6 +6,7 @@ use windows::core::PCSTR;
 pub mod theme_handler;
 pub mod hook_procedures;
 pub mod ipc_client;
+pub mod iat_patcher;
 
 use theme_handler::ThemeHandler;
 use ipc_client::IpcClient;
