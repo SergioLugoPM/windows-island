@@ -6,7 +6,7 @@ pub mod stats;
 pub mod weather;
 
 use std::{
-    sync::{Arc, Mutex, atomic::AtomicBool},
+    sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}},
     time::Instant,
 };
 use tauri::{Manager, State};
@@ -94,6 +94,53 @@ pub struct AppState {
 }
 
 // ─── Tauri commands ───────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn enable_theme_injection(
+    state: tauri::State<'_, AppState>,
+    theme_name: String,
+) -> Result<(), String> {
+    if state.injection_active.load(Ordering::Relaxed) {
+        return Ok(()); // Already active
+    }
+
+    // Select theme
+    let theme = match theme_name.as_str() {
+        "dark" => injector::theme::InjectedTheme::dark_theme(),
+        "light" => injector::theme::InjectedTheme::light_theme(),
+        "vidrio" => injector::theme::InjectedTheme::vidrio_theme(),
+        _ => injector::theme::InjectedTheme::dark_theme(),
+    };
+
+    // Write theme to shared memory
+    state.theme_manager
+        .lock()
+        .unwrap()
+        .write_theme(&theme)
+        .map_err(|e| format!("Failed to write theme: {}", e))?;
+
+    // Inject into Explorer
+    state.injector
+        .inject_into_explorer()
+        .map_err(|e| format!("Explorer injection failed: {:?}", e))?;
+
+    // Inject into StartMenuExperienceHost (Win11)
+    let _ = state.injector.inject_into_startmenu();
+
+    state.injection_active.store(true, Ordering::Relaxed);
+    Ok(())
+}
+
+#[tauri::command]
+async fn disable_theme_injection(state: tauri::State<'_, AppState>) -> Result<(), String> {
+    state.injection_active.store(false, Ordering::Relaxed);
+    Ok(())
+}
+
+#[tauri::command]
+fn is_injection_active(state: tauri::State<'_, AppState>) -> bool {
+    state.injection_active.load(Ordering::Relaxed)
+}
 
 #[tauri::command]
 fn get_cursor_screen_pos() -> (i32, i32) {
@@ -357,6 +404,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            enable_theme_injection,
+            disable_theme_injection,
+            is_injection_active,
             resize_window,
             resize_anchor_bottom,
             snap_to_edge,
