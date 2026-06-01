@@ -1,5 +1,6 @@
 pub mod cpu_temp;
 pub mod i18n;
+pub mod injector;
 pub mod media;
 pub mod stats;
 pub mod weather;
