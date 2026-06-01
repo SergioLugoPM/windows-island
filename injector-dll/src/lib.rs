@@ -37,11 +37,15 @@ pub extern "system" fn DllMain(
 ) -> BOOL {
     match call_reason {
         1 => { // DLL_PROCESS_ATTACH
-            // Initialize theme handler
+            // Initialize theme handler (populates DARK_THEME_COLORS into handler)
             let _ = get_theme_handler();
 
-            // Initialize hooks (implemented in Task 2)
-            // initialize_hooks();
+            // Install GetSysColor hook
+            if let Err(e) = hook_procedures::install_hooks() {
+                // Hook installation failed; log and continue — the DLL is still
+                // functional without the hook (colors just won't be overridden).
+                let _ = e; // TODO: surface via IPC once ipc_client is implemented
+            }
 
             unsafe {
                 on_dll_attach();
@@ -49,6 +53,9 @@ pub extern "system" fn DllMain(
             TRUE
         }
         0 => { // DLL_PROCESS_DETACH
+            // Restore original GetSysColor before we unload
+            let _ = hook_procedures::uninstall_hooks();
+
             unsafe {
                 on_dll_detach();
             }
