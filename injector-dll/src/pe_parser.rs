@@ -224,7 +224,7 @@ pub unsafe fn find_and_patch_iat(
                         )
                         .is_err()
                         {
-                            let _ = format!(
+                            eprintln!(
                                 "[windows-island] Warning: failed to restore IAT page protection"
                             );
                         }

@@ -141,7 +141,7 @@ pub extern "system" fn DllMain(
 
             TRUE
         }
-        _ => FALSE,
+        _ => TRUE, // DLL_THREAD_ATTACH / DLL_THREAD_DETACH — not an error
     }
 }
 

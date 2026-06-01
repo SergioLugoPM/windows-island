@@ -37,16 +37,20 @@ pub unsafe extern "system" fn cbt_hook_proc(
     }
 }
 
-/// Install the message hook for window events
+/// Install the message hook for window events.
+///
+/// **Phase 4 note:** This function is intentionally a no-op stub.
+/// IAT patching in `iat_patcher.rs` handles `GetSysColor` interception;
+/// the CBT hook (`SetWindowsHookExA`) is deferred to Phase 5.
+/// `MESSAGE_HOOK_ACTIVE` is set to `true` for future compatibility only.
 pub fn install_message_hook() -> Result<(), String> {
     unsafe {
         if MESSAGE_HOOK_HANDLE.is_some() {
             return Ok(()); // Already installed
         }
 
-        // Note: SetWindowsHookExA requires a valid thread ID
-        // In a full implementation, we would pass the correct thread ID
-        // For Phase 3, we skip the actual hook installation to avoid complications
+        // CBT hook installation (SetWindowsHookExA) is deferred to Phase 5.
+        // IAT patching in iat_patcher.rs is the active interception mechanism.
 
         MESSAGE_HOOK_ACTIVE.store(true, Ordering::Release);
         Ok(())

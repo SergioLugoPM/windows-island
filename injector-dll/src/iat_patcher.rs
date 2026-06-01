@@ -92,7 +92,7 @@ pub fn patch_iat_for_get_sys_color(
                 // Non-fatal: hook call-through still works via
                 // ORIGINAL_GET_SYS_COLOR; Explorer calls just won't be
                 // intercepted at the IAT level.
-                let _ = format!("[windows-island] IAT patch skipped: {e}");
+                eprintln!("[windows-island] IAT patch skipped: {e}");
             }
         }
     }
@@ -124,7 +124,7 @@ pub fn unpatch_iat() -> Result<(), String> {
                     Ok(_) => {}
                     Err(e) => {
                         // Do not panic — we must still clear statics.
-                        let _ = format!("[windows-island] IAT restore failed: {e}");
+                        eprintln!("[windows-island] IAT restore failed: {e}");
                     }
                 }
             }
