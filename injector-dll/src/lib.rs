@@ -1,5 +1,7 @@
 use std::sync::OnceLock;
 use windows::Win32::Foundation::{HINSTANCE, BOOL, TRUE, FALSE};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 pub mod theme_handler;
 pub mod hook_procedures;
@@ -13,6 +15,10 @@ use ipc_client::IpcClient;
 
 static THEME_HANDLER: OnceLock<ThemeHandler> = OnceLock::new();
 static IPC_CLIENT: OnceLock<IpcClient> = OnceLock::new();
+
+/// Controls the background theme polling thread lifetime.
+/// Set to `true` on DLL attach, `false` on DLL detach.
+static REFRESH_THREAD_RUNNING: AtomicBool = AtomicBool::new(false);
 
 fn get_theme_handler() -> &'static ThemeHandler {
     THEME_HANDLER.get_or_init(ThemeHandler::new)
@@ -55,6 +61,45 @@ fn initialize_theme_from_ipc() {
     }
 }
 
+/// Spawn a background thread that polls IPC shared memory every 500 ms.
+///
+/// When `config.version` changes, the cached theme is updated and
+/// `redraw_taskbar_windows()` is called to repaint Shell_TrayWnd.
+///
+/// `last_version` starts at `u32::MAX` so the first poll always triggers
+/// an update, ensuring the taskbar gets the correct colors on injection.
+///
+/// # Safety note on spawning from DllMain
+/// Spawning a thread from `DLL_PROCESS_ATTACH` while the loader lock is held
+/// is safe here: the thread body only calls Win32 APIs and our own statics —
+/// it never calls `LoadLibrary` or anything that re-enters the loader.
+fn start_theme_refresh_thread() {
+    REFRESH_THREAD_RUNNING.store(true, Ordering::SeqCst);
+
+    std::thread::spawn(|| {
+        let mut last_version: u32 = u32::MAX; // force first-poll update
+
+        while REFRESH_THREAD_RUNNING.load(Ordering::Acquire) {
+            if let Some(client) = get_ipc_client() {
+                if let Ok(config) = client.read_theme_config() {
+                    if config.version != last_version {
+                        last_version = config.version;
+                        hook_procedures::update_cached_theme(config);
+                        let _ = message_handler::redraw_taskbar_windows();
+                    }
+                }
+            }
+            std::thread::sleep(Duration::from_millis(500));
+        }
+    });
+}
+
+/// Signal the background thread to exit on the next 500 ms tick.
+/// Does NOT join — `DllMain` must not block.
+fn stop_theme_refresh_thread() {
+    REFRESH_THREAD_RUNNING.store(false, Ordering::SeqCst);
+}
+
 #[no_mangle]
 pub extern "system" fn DllMain(
     _module: HINSTANCE,
@@ -82,9 +127,15 @@ pub extern "system" fn DllMain(
                 let _ = e; // TODO: surface via IPC once ipc_client is implemented
             }
 
+            // Start background polling thread after hooks are installed.
+            start_theme_refresh_thread();
+
             TRUE
         }
         0 => { // DLL_PROCESS_DETACH
+            // Signal thread to stop before restoring the IAT.
+            stop_theme_refresh_thread();
+
             // Restore original GetSysColor before we unload
             let _ = hook_procedures::uninstall_hooks();
 
