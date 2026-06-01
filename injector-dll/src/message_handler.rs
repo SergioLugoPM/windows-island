@@ -1,12 +1,13 @@
 //! Window message handler for intercepting color change events
 
-use windows::Win32::Foundation::{HWND, LPARAM, WPARAM, LRESULT};
-use windows::Win32::System::Diagnostics::Debug::WriteProcessMemory;
-use windows::Win32::UI::WindowsAndMessaging::{
-    SetWindowsHookExA, UnhookWindowsHookEx, CallNextHookEx, HHOOK, HC_ACTION,
-    WH_CBT, HCBT_CREATEWND, WM_SETTINGCHANGE, WM_SYSCOLORCHANGE,
-};
 use std::sync::atomic::{AtomicBool, Ordering};
+use windows::core::PCSTR;
+use windows::Win32::Foundation::{BOOL, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Graphics::Gdi::{InvalidateRect, UpdateWindow};
+use windows::Win32::UI::WindowsAndMessaging::{
+    CallNextHookEx, FindWindowA, FindWindowExA, HC_ACTION, HHOOK,
+    SendMessageA, UnhookWindowsHookEx, WM_SYSCOLORCHANGE,
+};
 
 /// Global flag to track if message hook is active
 pub static MESSAGE_HOOK_ACTIVE: AtomicBool = AtomicBool::new(false);
@@ -65,11 +66,35 @@ pub fn uninstall_message_hook() -> Result<(), String> {
 
 /// Force all taskbar windows to redraw with new colors
 pub fn redraw_taskbar_windows() -> Result<(), String> {
-    // In a full implementation:
-    // 1. Enumerate all windows with FindWindowA for "Shell_TrayWnd"
-    // 2. Call InvalidateRect to mark for redraw
-    // 3. Call UpdateWindow to force immediate redraw
+    unsafe {
+        // ── Primary taskbar (always present) ─────────────────────────────────
+        let tray_class = PCSTR::from_raw(b"Shell_TrayWnd\0".as_ptr());
+        let hwnd = FindWindowA(tray_class, PCSTR::null())
+            .map_err(|_| "Shell_TrayWnd not found — taskbar may not be running")?;
 
-    // For Phase 3, this is prepared for Phase 4 wiring
-    Ok(())
+        // Invalidate the entire client area and force immediate repaint.
+        let _ = InvalidateRect(hwnd, None, BOOL(1));
+        let _ = UpdateWindow(hwnd);
+
+        // WM_SYSCOLORCHANGE tells the taskbar its color cache is stale.
+        SendMessageA(hwnd, WM_SYSCOLORCHANGE, WPARAM(0), LPARAM(0));
+
+        // ── Secondary taskbars (one per additional monitor, may not exist) ───
+        let sec_class = PCSTR::from_raw(b"Shell_SecondaryTrayWnd\0".as_ptr());
+        if let Ok(mut secondary) = FindWindowA(sec_class, PCSTR::null()) {
+            loop {
+                let _ = InvalidateRect(secondary, None, BOOL(1));
+                let _ = UpdateWindow(secondary);
+                SendMessageA(secondary, WM_SYSCOLORCHANGE, WPARAM(0), LPARAM(0));
+
+                // Advance to the next instance (one per monitor beyond the first).
+                match FindWindowExA(HWND(std::ptr::null_mut()), secondary, sec_class, PCSTR::null()) {
+                    Ok(next) => secondary = next,
+                    Err(_) => break,
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
