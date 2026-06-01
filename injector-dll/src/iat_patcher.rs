@@ -1,22 +1,20 @@
-//! IAT Patcher module for Phase 3 — stores the original `GetSysColor` pointer
-//! so that `hooked_get_sys_color` can call through to the real implementation.
+//! IAT Patcher — stores the original `GetSysColor` pointer and patches
+//! Explorer.exe's Import Address Table to redirect calls to our hook.
 //!
-//! # Phase 3 scope
-//! This module retrieves the `GetSysColor` function pointer from user32.dll at
-//! DLL load time via `GetModuleHandleA` + `GetProcAddress` and stores it in a
-//! `static mut` for the hook stub to call.  It does **not** yet write to the
-//! Import Address Table of the host process's PE image; that step (modifying
-//! the IAT entries in the loaded executable's memory) is deferred to **Phase 4**
-//! once the full IAT-patching engine is implemented.
+//! # Phase 4 implementation
+//! This module:
+//! 1. Retrieves the `GetSysColor` pointer from user32.dll via
+//!    `GetModuleHandleA` + `GetProcAddress` and stores it in
+//!    [`ORIGINAL_GET_SYS_COLOR`] for hook call-through.
+//! 2. Calls `pe_parser::find_and_patch_iat` to overwrite the IAT entry in
+//!    the host process (Explorer.exe), redirecting `GetSysColor` calls to
+//!    `hooked_get_sys_color`.  The original address is restored in
+//!    `unpatch_iat` on `DLL_PROCESS_DETACH`.
 //!
 //! # Safety model
-//! All accesses to `ORIGINAL_GET_SYS_COLOR` are gated behind `unsafe` blocks.
-//! - `patch_iat_for_get_sys_color` must be called exactly once, during
-//!   `DLL_PROCESS_ATTACH`, before any thread can invoke the hook.
-//! - `unpatch_iat` must be called exactly once, during `DLL_PROCESS_DETACH`,
-//!   after all threads have stopped invoking the hook.
-//! No synchronisation primitive is used because both operations happen while
-//! the Windows loader lock is held (DllMain), which serialises all threads.
+//! All accesses to `ORIGINAL_GET_SYS_COLOR` and `IAT_PATCHED` are gated
+//! behind `unsafe` blocks and called only from `DllMain` while the Windows
+//! loader lock is held, which serialises all threads.
 
 use std::mem;
 
@@ -52,10 +50,9 @@ pub static mut IAT_PATCHED: bool = false;
 /// Locate `GetSysColor` in user32.dll and store the pointer in
 /// [`ORIGINAL_GET_SYS_COLOR`].
 ///
-/// The `hooked_fn` parameter accepts the address of our hook function.  It is
-/// currently unused in Phase 3 (we only store the *original* pointer), but the
-/// argument is present so that Phase 4 can pass the replacement address into
-/// the actual IAT-patching engine without changing the call-site signature.
+/// The `hooked_fn` parameter is the address of the replacement function
+/// written into the IAT.  After this call returns `Ok(())`, every call to
+/// `GetSysColor` inside the host process will be redirected to `hooked_fn`.
 ///
 /// # Errors
 /// Returns a human-readable `Err` string when:
