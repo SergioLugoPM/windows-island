@@ -3,6 +3,8 @@
 //! Phase 1: Basic injection pipeline with shared memory theme IPC.
 //! No rendering hooks yet — logs only.
 
+pub mod theme;
+
 use std::ffi::CString;
 use std::path::PathBuf;
 use windows::Win32::System::Diagnostics::ToolHelp::{
