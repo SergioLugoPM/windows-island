@@ -148,6 +148,7 @@ export function Island() {
   const [injectionActive, setInjectionActive] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState<'dark' | 'light' | 'vidrio'>('dark');
   const [injectionLoading, setInjectionLoading] = useState(false);
+  const [injectionError, setInjectionError]     = useState<string | null>(null);
 
   const idleAudio = useAudioVisualizer(isPlaying, 18);
 
@@ -448,6 +449,7 @@ export function Island() {
   const handleToggleInjection = async () => {
     if (!isTauri) return;
     setInjectionLoading(true);
+    setInjectionError(null);
     try {
       if (!injectionActive) {
         await invoke('enable_theme_injection', { themeName: selectedTheme });
@@ -457,8 +459,9 @@ export function Island() {
         setInjectionActive(false);
       }
     } catch (error) {
-      console.error('Injection toggle failed:', error);
-      alert(`Error: ${error}`);
+      const msg = String(error);
+      setInjectionError(msg);
+      console.error('Injection toggle failed:', msg);
     } finally {
       setInjectionLoading(false);
     }
@@ -727,6 +730,21 @@ export function Island() {
                     <div style={{ fontSize: 8, color: 'rgba(100,120,160,0.6)', textAlign: 'center' }}>
                       Estado: {injectionActive ? '✓ Activo' : '○ Inactivo'}
                     </div>
+
+                    {injectionError && (
+                      <div style={{
+                        fontSize: 8,
+                        color: '#ff6b6b',
+                        textAlign: 'center',
+                        marginTop: 4,
+                        lineHeight: 1.3,
+                        padding: '3px 4px',
+                        background: 'rgba(255,60,60,0.08)',
+                        borderRadius: 4,
+                      }}>
+                        ⚠ {injectionError}
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ fontSize: 9, color: "rgba(100,120,180,0.4)", textAlign: "center", marginTop: 8 }}>

@@ -40,11 +40,15 @@ fn build_injector_dll() {
     let dll_dst = target_dir.join("debug/windows_island_injector_dll.dll");
 
     if dll_src.exists() {
-        std::fs::copy(&dll_src, &dll_dst).expect("Failed to copy injector DLL");
-        println!(
-            "cargo:warning=injector DLL copied to {}",
-            dll_dst.display()
-        );
+        match std::fs::copy(&dll_src, &dll_dst) {
+            Ok(_) => println!(
+                "cargo:warning=injector DLL copied to {}",
+                dll_dst.display()
+            ),
+            Err(e) => println!(
+                "cargo:warning=injector DLL copy skipped (file in use?): {e}"
+            ),
+        };
     } else {
         println!(
             "cargo:warning=DLL not found at {} after build",

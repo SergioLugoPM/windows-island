@@ -159,7 +159,13 @@ async fn enable_theme_injection(
     // Inject into Explorer
     state.injector
         .inject_into_explorer()
-        .map_err(|e| format!("Explorer injection failed: {:?}", e))?;
+        .map_err(|e| match e {
+            injector::InjectorError::OpenProcessFailed(_) =>
+                "Administrator required — right-click Windows Island and select 'Run as administrator'".to_string(),
+            injector::InjectorError::DllNotFound =>
+                "Injector DLL not found. Try rebuilding the app.".to_string(),
+            other => format!("Injection failed: {:?}", other),
+        })?;
 
     // Inject into StartMenuExperienceHost (Win11)
     let _ = state.injector.inject_into_startmenu();
