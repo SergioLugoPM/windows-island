@@ -10,49 +10,57 @@ fn build_injector_dll() {
     let project_root = manifest_dir.parent().expect("src-tauri has no parent");
     let injector_dir = project_root.join("injector-dll");
 
-    // Re-run build script whenever injector-dll source changes
     println!("cargo:rerun-if-changed=../injector-dll/src");
     println!("cargo:rerun-if-changed=../injector-dll/Cargo.toml");
 
     if !injector_dir.exists() {
-        println!("cargo:warning=injector-dll directory not found, skipping DLL build");
+        println!("cargo:warning=injector-dll directory not found, skipping");
         return;
     }
 
-    // Build the injector DLL crate
+    // Match the host profile so debug builds stay fast and release builds are optimized
+    let profile = std::env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
+    let release_flag: &[&str] = if profile == "release" { &["--release"] } else { &[] };
+
     let status = std::process::Command::new("cargo")
-        .args(["build", "--lib"])
+        .arg("build")
+        .arg("--lib")
+        .args(release_flag)
         .current_dir(&injector_dir)
         .status()
         .expect("Failed to invoke cargo for injector-dll");
 
     if !status.success() {
-        panic!("injector-dll build failed — check injector-dll/src for errors");
+        panic!("injector-dll build failed");
     }
 
-    // Locate built DLL and copy it next to the main executable
-    let dll_src = injector_dir.join("target/debug/windows_island_injector_dll.dll");
+    let dll_src = injector_dir
+        .join("target")
+        .join(&profile)
+        .join("windows_island_injector_dll.dll");
 
+    if !dll_src.exists() {
+        println!("cargo:warning=DLL not found at {}", dll_src.display());
+        return;
+    }
+
+    // 1. Copy next to the main exe (works for `cargo tauri dev`)
     let target_dir = std::env::var("CARGO_TARGET_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| manifest_dir.join("target"));
 
-    let dll_dst = target_dir.join("debug/windows_island_injector_dll.dll");
+    let dll_next_to_exe = target_dir.join(&profile).join("windows_island_injector_dll.dll");
+    match std::fs::copy(&dll_src, &dll_next_to_exe) {
+        Ok(_)  => println!("cargo:warning=DLL → {}", dll_next_to_exe.display()),
+        Err(e) => println!("cargo:warning=DLL copy skipped (in use?): {e}"),
+    }
 
-    if dll_src.exists() {
-        match std::fs::copy(&dll_src, &dll_dst) {
-            Ok(_) => println!(
-                "cargo:warning=injector DLL copied to {}",
-                dll_dst.display()
-            ),
-            Err(e) => println!(
-                "cargo:warning=injector DLL copy skipped (file in use?): {e}"
-            ),
-        };
-    } else {
-        println!(
-            "cargo:warning=DLL not found at {} after build",
-            dll_src.display()
-        );
+    // 2. Copy into src-tauri/resources/ so Tauri bundles it with the installer
+    let resources_dir = manifest_dir.join("resources");
+    std::fs::create_dir_all(&resources_dir).ok();
+    let dll_resource = resources_dir.join("windows_island_injector_dll.dll");
+    match std::fs::copy(&dll_src, &dll_resource) {
+        Ok(_)  => println!("cargo:warning=DLL → resources/ (bundled)"),
+        Err(e) => println!("cargo:warning=DLL resource copy failed: {e}"),
     }
 }
