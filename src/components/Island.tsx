@@ -173,6 +173,20 @@ export function Island() {
     }
   }, []);
 
+  // ── Sync island theme with Windows system theme on startup ──
+  useEffect(() => {
+    if (!isTauri) return;
+    invoke<{ is_dark: boolean; accent_r: number; accent_g: number; accent_b: number }>(
+      'get_windows_theme'
+    ).then(({ is_dark }) => {
+      // Only auto-set if user hasn't manually saved a preference
+      const saved = localStorage.getItem('halow-settings');
+      if (!saved) {
+        setSelectedTheme(is_dark ? 'dark' : 'light');
+      }
+    }).catch(() => {});
+  }, []);
+
   // ── Snap when positionMode changes ──
   useEffect(() => {
     if (settings.positionMode !== "floating") {
@@ -370,6 +384,9 @@ export function Island() {
 
   const handleMouseDown = useCallback(async (e: React.MouseEvent) => {
     if (e.button !== 0) return;
+    // In settings mode: never drag — startDrag() generates OS-level mouse events
+    // that fire spurious mouseleave → collapse, and breaks option interactions.
+    if (mode === "settings") return;
     const tag = (e.target as HTMLElement).closest("button, input, select, a");
     if (tag) return;
 
@@ -395,7 +412,7 @@ export function Island() {
     }, 600);
 
     await startDrag();
-  }, [cancelCollapse, scheduleCollapse, settings.clockSize]);
+  }, [cancelCollapse, scheduleCollapse, settings.clockSize, mode]);
 
   const handleMouseUp = useCallback(async () => {
     clearTimeout(longPressTimer.current);

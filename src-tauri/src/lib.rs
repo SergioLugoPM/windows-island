@@ -254,6 +254,85 @@ fn is_injection_active(state: tauri::State<'_, AppState>) -> bool {
     state.injection_active.load(Ordering::Relaxed)
 }
 
+/// Returns the current Windows accent color and dark-mode setting so the
+/// island can mirror the system theme.
+///
+/// Returns `{ is_dark: bool, accent_r: u8, accent_g: u8, accent_b: u8 }`.
+#[tauri::command]
+fn get_windows_theme() -> serde_json::Value {
+    #[cfg(target_os = "windows")]
+    {
+        use std::ffi::OsStr;
+        use std::os::windows::ffi::OsStrExt;
+
+        // ── Read dark/light mode ──────────────────────────────────────────────
+        let is_dark = read_reg_dword(
+            "Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+            "SystemUsesLightTheme",
+        ).map(|v| v == 0).unwrap_or(true);
+
+        // ── Read accent color (DWM stores it as 0xAABBGGRR) ─────────────────
+        let accent_bgr = read_reg_dword(
+            "Software\\Microsoft\\Windows\\DWM",
+            "AccentColor",
+        ).unwrap_or(0xFF_CC_99_33); // fallback: warm amber
+
+        let r = ((accent_bgr >>  0) & 0xFF) as u8;
+        let g = ((accent_bgr >>  8) & 0xFF) as u8;
+        let b = ((accent_bgr >> 16) & 0xFF) as u8;
+
+        return serde_json::json!({
+            "is_dark": is_dark,
+            "accent_r": r,
+            "accent_g": g,
+            "accent_b": b,
+        });
+    }
+    #[cfg(not(target_os = "windows"))]
+    serde_json::json!({ "is_dark": true, "accent_r": 100, "accent_g": 180, "accent_b": 255 })
+}
+
+/// Read a DWORD value from HKCU via raw Win32 (no winreg crate needed).
+#[cfg(target_os = "windows")]
+fn read_reg_dword(subkey: &str, value: &str) -> Option<u32> {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+
+    extern "system" {
+        fn RegOpenKeyExW(
+            h_key: isize, lp_sub_key: *const u16,
+            ul_options: u32, sam_desired: u32, phk_result: *mut isize,
+        ) -> i32;
+        fn RegQueryValueExW(
+            h_key: isize, lp_value_name: *const u16, lp_reserved: *const u32,
+            lp_type: *mut u32, lp_data: *mut u8, lpcb_data: *mut u32,
+        ) -> i32;
+        fn RegCloseKey(h_key: isize) -> i32;
+    }
+
+    const HKCU: isize = -2147483647; // 0x80000001 as isize
+    const KEY_READ: u32 = 0x20019;
+
+    let sub_w: Vec<u16> = OsStr::new(subkey).encode_wide().chain(Some(0)).collect();
+    let val_w: Vec<u16> = OsStr::new(value).encode_wide().chain(Some(0)).collect();
+
+    unsafe {
+        let mut hk: isize = 0;
+        if RegOpenKeyExW(HKCU, sub_w.as_ptr(), 0, KEY_READ, &mut hk) != 0 {
+            return None;
+        }
+        let mut data: u32 = 0;
+        let mut size: u32 = 4;
+        let mut typ: u32 = 0;
+        let ok = RegQueryValueExW(
+            hk, val_w.as_ptr(), std::ptr::null(),
+            &mut typ, &mut data as *mut u32 as *mut u8, &mut size,
+        );
+        RegCloseKey(hk);
+        if ok == 0 { Some(data) } else { None }
+    }
+}
+
 #[tauri::command]
 fn get_cursor_screen_pos() -> (i32, i32) {
     #[cfg(target_os = "windows")]
@@ -552,6 +631,7 @@ pub fn run() {
             enable_theme_injection,
             disable_theme_injection,
             is_injection_active,
+            get_windows_theme,
             resize_window,
             resize_anchor_bottom,
             snap_to_edge,
