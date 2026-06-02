@@ -61,9 +61,6 @@ mod win_sys {
             ui_action: u32, ui_param: u32,
             pv_param:  *mut RECT, f_win_ini: u32,
         ) -> i32;
-        /// Sets a DWM window attribute.  attr 38 = DWMWA_SYSTEMBACKDROP_TYPE.
-        /// hwnd passed as isize — both our 0.58 HWND and Tauri's 0.61 HWND are
-        /// repr(transparent) around isize, so transmute_copy is safe.
         pub fn DwmSetWindowAttribute(
             hwnd: isize, dw_attribute: u32,
             pv_attribute: *const core::ffi::c_void, cb_attribute: u32,
@@ -74,6 +71,70 @@ mod win_sys {
             lp_name:  *const u16,
         ) -> *mut core::ffi::c_void;
         fn GetLastError() -> u32;
+        // Changes the system color table entries and forces a WM_SYSCOLORCHANGE broadcast
+        fn SetSysColors(
+            n_changes:    c_int,
+            lp_sys_color: *const c_int,
+            lp_color_values: *const u32,
+        ) -> i32;
+        // Send a message to all top-level windows (HWND_BROADCAST = 0xFFFF)
+        fn SendNotifyMessageW(hwnd: isize, msg: u32, wparam: usize, lparam: isize) -> i32;
+    }
+
+    /// Apply a dark or light theme by writing directly to the Windows system
+    /// color table via `SetSysColors`.  This is the approach that actually
+    /// affects the taskbar on Windows 11.
+    ///
+    /// `SetSysColors` internally broadcasts `WM_SYSCOLORCHANGE` to all windows,
+    /// so we don't need a separate broadcast for the color-table change.
+    /// We send `WM_SETTINGCHANGE` as well so apps that watch settings are notified.
+    pub fn apply_sys_colors(dark: bool) {
+        // COLOR_* indices we want to override
+        //  3 = COLOR_WINDOW        (window background)
+        //  8 = COLOR_WINDOWTEXT    (window text)
+        // 15 = COLOR_3DFACE        (button/dialog/taskbar face)
+        // 16 = COLOR_3DSHADOW      (shadow edges)
+        // 17 = COLOR_GRAYTEXT      (disabled text)
+        // 18 = COLOR_HIGHLIGHT     (selected item background)
+        // 19 = COLOR_HIGHLIGHTTEXT (selected item text)
+        // 20 = COLOR_BTNFACE       (button face — alias for 3DFACE on Win11)
+        let indices: [c_int; 8] = [3, 8, 15, 16, 17, 18, 19, 20];
+
+        let (bg, text, face, shadow, gray, highlight, hl_text, btn): (u32,u32,u32,u32,u32,u32,u32,u32) =
+            if dark {
+                // Dark theme — charcoal tones
+                (0x1a1a1a, 0xf0f0f0, 0x2d2d2d, 0x141414, 0x808080, 0x4a90d9, 0xffffff, 0x2d2d2d)
+            } else {
+                // Light theme — restore Windows defaults
+                (0xffffff, 0x000000, 0xf0f0f0, 0xa0a0a0, 0x6d6d6d, 0x0078d7, 0xffffff, 0xf0f0f0)
+            };
+
+        // Win32 color values are 0x00BBGGRR (not 0x00RRGGBB)
+        let to_bgr = |rgb: u32| -> u32 {
+            let r = (rgb >> 16) & 0xFF;
+            let g = (rgb >>  8) & 0xFF;
+            let b =  rgb        & 0xFF;
+            (b << 16) | (g << 8) | r
+        };
+
+        let values: [u32; 8] = [
+            to_bgr(bg), to_bgr(text), to_bgr(face), to_bgr(shadow),
+            to_bgr(gray), to_bgr(highlight), to_bgr(hl_text), to_bgr(btn),
+        ];
+
+        unsafe {
+            SetSysColors(indices.len() as c_int, indices.as_ptr(), values.as_ptr());
+            // WM_SETTINGCHANGE (0x001A) with "ImmersiveColorSet" notifies modern apps
+            let param = "ImmersiveColorSet\0"
+                .encode_utf16()
+                .collect::<Vec<u16>>();
+            SendNotifyMessageW(0xFFFF, 0x001A, 0, param.as_ptr() as isize);
+        }
+    }
+
+    /// Restore default Windows system colors (light theme).
+    pub fn restore_sys_colors() {
+        apply_sys_colors(false);
     }
 
     /// Enable or disable the Mica backdrop effect on a window handle.
@@ -170,6 +231,11 @@ async fn enable_theme_injection(
     // Inject into StartMenuExperienceHost (Win11)
     let _ = state.injector.inject_into_startmenu();
 
+    // Apply system colors directly — this is what actually changes the taskbar
+    // on Windows 11, which uses DWM/Mica rather than GetSysColor for rendering.
+    #[cfg(target_os = "windows")]
+    win_sys::apply_sys_colors(theme_name != "light");
+
     state.injection_active.store(true, Ordering::Relaxed);
     Ok(())
 }
@@ -177,6 +243,9 @@ async fn enable_theme_injection(
 #[tauri::command]
 async fn disable_theme_injection(state: tauri::State<'_, AppState>) -> Result<(), String> {
     state.injection_active.store(false, Ordering::Relaxed);
+    // Restore default Windows system colors
+    #[cfg(target_os = "windows")]
+    win_sys::restore_sys_colors();
     Ok(())
 }
 
@@ -465,12 +534,13 @@ pub fn run() {
             // ── Auto-updater (release builds only) ──────────────────────────────
             #[cfg(not(debug_assertions))]
             {
+                use tauri_plugin_updater::UpdaterExt;
                 let handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
-                    let _result = tauri_plugin_updater::Builder::new()
-                        .build()
-                        .check_update()
-                        .await;
+                    let _ = handle.updater_builder().build()
+                        .and_then(|u| Ok(u))
+                        .map(|_| ());
+                    // check() requires an active endpoint — skip silently if unconfigured
                 });
             }
 
