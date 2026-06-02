@@ -330,8 +330,12 @@ export function Island() {
     clearTimeout(hoverTimer.current);
     setOpacity(0.72);
     setLiq(0.4);
+    // Settings mode: the panel resizes on open, which fires a spurious mouseleave
+    // that would override the 8 s timer set by the long-press handler.
+    // Don't shorten it — let the existing 8 s (or longer) timer run.
+    if (mode === "settings") return;
     scheduleCollapse(2800);
-  }, [scheduleCollapse]);
+  }, [scheduleCollapse, mode]);
 
   // ── Click: cycle modes ──
   const handleClick = useCallback(async () => {

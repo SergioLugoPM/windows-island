@@ -1231,6 +1231,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "halow"
+version = "0.3.0"
+dependencies = [
+ "chrono",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sysinfo",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-updater",
+ "thiserror 1.0.69",
+ "tokio",
+ "urlencoding",
+ "windows 0.58.0",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4766,24 +4784,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
-]
-
-[[package]]
-name = "windows-island"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sysinfo",
- "tauri",
- "tauri-build",
- "tauri-plugin-updater",
- "thiserror 1.0.69",
- "tokio",
- "urlencoding",
- "windows 0.58.0",
 ]
 
 [[package]]

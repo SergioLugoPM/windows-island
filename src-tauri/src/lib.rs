@@ -169,7 +169,7 @@ mod win_sys {
     /// Returns false if another instance is already running (named mutex already exists).
     /// Call once at startup; intentionally leaks the handle so it lives for the process.
     pub fn claim_single_instance() -> bool {
-        let name: Vec<u16> = "Local\\WindowsIsland_SingleInstance_v1"
+        let name: Vec<u16> = "Local\\HaloW_SingleInstance_v1"
             .encode_utf16()
             .chain(std::iter::once(0))
             .collect();

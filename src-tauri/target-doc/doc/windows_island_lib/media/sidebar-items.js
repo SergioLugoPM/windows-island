@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["get_media_info","skip_next","skip_previous","toggle_play_pause"],"struct":["MediaInfo"]};

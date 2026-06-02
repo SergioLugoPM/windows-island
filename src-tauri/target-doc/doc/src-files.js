@@ -1,0 +1,2 @@
+createSrcSidebar('[["windows_island",["",[],["main.rs"]]],["windows_island_lib",["",[["injector",[],["mod.rs","theme.rs"]]],["cpu_temp.rs","i18n.rs","lib.rs","media.rs","stats.rs","weather.rs"]]]]');
+//{"start":19,"fragment_lengths":[38,138]}
