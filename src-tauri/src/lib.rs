@@ -349,9 +349,14 @@ fn get_work_area_bottom() -> i32 {
     0
 }
 
+/// Helper — resolve a window by label, falling back to "main".
+fn island_win(app: &tauri::AppHandle, label: Option<&str>) -> Option<tauri::WebviewWindow> {
+    app.get_webview_window(label.unwrap_or("main"))
+}
+
 #[tauri::command]
-async fn set_cursor_passthrough(app: tauri::AppHandle, enabled: bool) {
-    if let Some(win) = app.get_webview_window("main") {
+async fn set_cursor_passthrough(app: tauri::AppHandle, label: Option<String>, enabled: bool) {
+    if let Some(win) = island_win(&app, label.as_deref()) {
         let _ = win.set_ignore_cursor_events(enabled);
     }
 }
@@ -360,8 +365,8 @@ async fn set_cursor_passthrough(app: tauri::AppHandle, enabled: bool) {
 /// enabled → 2 (Mica, Win11 22H2+)  |  disabled → 1 (auto/off)
 /// Called from JS when switching to/from the "glass" theme.
 #[tauri::command]
-async fn set_mica_effect(app: tauri::AppHandle, enabled: bool) {
-    if let Some(win) = app.get_webview_window("main") {
+async fn set_mica_effect(app: tauri::AppHandle, label: Option<String>, enabled: bool) {
+    if let Some(win) = island_win(&app, label.as_deref()) {
         #[cfg(target_os = "windows")]
         if let Ok(hwnd) = win.hwnd() {
             // SAFETY: HWND is repr(transparent) around isize in all recent
@@ -374,55 +379,75 @@ async fn set_mica_effect(app: tauri::AppHandle, enabled: bool) {
 
 /// Resize keeping bottom edge anchored to work area (above taskbar).
 #[tauri::command]
-async fn resize_anchor_bottom(app: tauri::AppHandle, w: f64, h: f64) {
-    if let Some(win) = app.get_webview_window("main") {
+async fn resize_anchor_bottom(app: tauri::AppHandle, label: Option<String>, w: f64, h: f64) {
+    if let Some(win) = island_win(&app, label.as_deref()) {
         if let Ok(Some(monitor)) = win.current_monitor() {
             let scale = monitor.scale_factor();
+            let mx = monitor.position().x as f64 / scale;
+            let my = monitor.position().y as f64 / scale;
             let sw = monitor.size().width as f64 / scale;
+            let sh = monitor.size().height as f64 / scale;
             #[cfg(target_os = "windows")]
-            let work_bottom = win_sys::work_area_bottom() as f64 / scale;
+            let work_bottom = if monitor.position().x == 0 && monitor.position().y == 0 {
+                win_sys::work_area_bottom() as f64 / scale
+            } else {
+                my + sh
+            };
             #[cfg(not(target_os = "windows"))]
-            let work_bottom = monitor.size().height as f64 / scale;
+            let work_bottom = my + sh;
             let _ = win.set_size(tauri::LogicalSize::new(w, h));
-            let _ = win.set_position(tauri::LogicalPosition::new((sw - w) / 2.0, work_bottom - h));
+            let _ = win.set_position(tauri::LogicalPosition::new(mx + (sw - w) / 2.0, work_bottom - h));
         }
     }
 }
 
 #[tauri::command]
-async fn resize_window(app: tauri::AppHandle, w: f64, h: f64) {
-    if let Some(win) = app.get_webview_window("main") {
+async fn resize_window(app: tauri::AppHandle, label: Option<String>, w: f64, h: f64) {
+    if let Some(win) = island_win(&app, label.as_deref()) {
         let _ = win.set_size(tauri::LogicalSize::new(w, h));
         if let Ok(Some(monitor)) = win.current_monitor() {
             let scale = monitor.scale_factor();
+            // Logical origin of this monitor in the virtual desktop.
+            // For the primary monitor this is 0,0; for secondary monitors it is
+            // their physical offset divided by scale.
+            let mx = monitor.position().x as f64 / scale;
             let sw = monitor.size().width as f64 / scale;
+            // Keep current Y (preserves top / floating position).
             let cur_y = win.outer_position()
                 .map(|p| p.y as f64 / scale)
-                .unwrap_or(4.0);
-            let _ = win.set_position(tauri::LogicalPosition::new((sw - w) / 2.0, cur_y));
+                .unwrap_or(monitor.position().y as f64 / scale);
+            let _ = win.set_position(tauri::LogicalPosition::new(mx + (sw - w) / 2.0, cur_y));
         }
     }
 }
 
 #[tauri::command]
-async fn snap_to_edge(app: tauri::AppHandle, edge: String, w: f64, h: f64) {
-    if let Some(win) = app.get_webview_window("main") {
+async fn snap_to_edge(app: tauri::AppHandle, label: Option<String>, edge: String, w: f64, h: f64) {
+    if let Some(win) = island_win(&app, label.as_deref()) {
         if let Ok(Some(monitor)) = win.current_monitor() {
             let scale = monitor.scale_factor();
+            // Logical origin + dimensions of this monitor.
+            let mx = monitor.position().x as f64 / scale;
+            let my = monitor.position().y as f64 / scale;
             let sw = monitor.size().width as f64 / scale;
             let sh = monitor.size().height as f64 / scale;
             let (nx, ny) = match edge.as_str() {
-                "top" => ((sw - w) / 2.0, 0.0),
+                "top" => (mx + (sw - w) / 2.0, my),
                 "bottom" => {
+                    // work_area_bottom is primary-monitor only; use monitor bottom for others.
                     #[cfg(target_os = "windows")]
-                    let wb = win_sys::work_area_bottom() as f64 / scale;
+                    let wb = if monitor.position().x == 0 && monitor.position().y == 0 {
+                        win_sys::work_area_bottom() as f64 / scale
+                    } else {
+                        my + sh
+                    };
                     #[cfg(not(target_os = "windows"))]
-                    let wb = sh;
-                    ((sw - w) / 2.0, wb - h)
+                    let wb = my + sh;
+                    (mx + (sw - w) / 2.0, wb - h)
                 }
-                "left"  => (0.0, (sh - h) / 2.0),
-                "right" => (sw - w, (sh - h) / 2.0),
-                _       => ((sw - w) / 2.0, 0.0),
+                "left"  => (mx,           my + (sh - h) / 2.0),
+                "right" => (mx + sw - w,  my + (sh - h) / 2.0),
+                _       => (mx + (sw - w) / 2.0, my),
             };
             let _ = win.set_size(tauri::LogicalSize::new(w, h));
             let _ = win.set_position(tauri::LogicalPosition::new(nx, ny));
@@ -494,7 +519,55 @@ fn refresh_injected_theme_config() -> Result<(), String> {
     Ok(())
 }
 
+// ─── Multi-monitor support ─────────────────────────────────────────────────────
+
+#[derive(serde::Serialize)]
+struct MonitorInfo {
+    /// Physical-pixel X origin of this monitor on the virtual desktop.
+    x: i32,
+    /// Physical-pixel Y origin of this monitor on the virtual desktop.
+    y: i32,
+    /// Physical-pixel width of this monitor.
+    width: u32,
+    /// Physical-pixel height of this monitor.
+    height: u32,
+    /// DPI scale factor (1.0 = 96 dpi, 1.5 = 144 dpi, 2.0 = 192 dpi, …).
+    scale_factor: f64,
+}
+
+/// Returns the physical-pixel bounds and scale factor of the monitor that
+/// contains the given island window (or "main" if label is None).
+#[tauri::command]
+async fn get_window_monitor(app: tauri::AppHandle, label: Option<String>) -> Option<MonitorInfo> {
+    let win = island_win(&app, label.as_deref())?;
+    let monitor = win.current_monitor().ok()??;
+    Some(MonitorInfo {
+        x:            monitor.position().x,
+        y:            monitor.position().y,
+        width:        monitor.size().width,
+        height:       monitor.size().height,
+        scale_factor: monitor.scale_factor(),
+    })
+}
+
 // ─── Entry point ──────────────────────────────────────────────────────────────
+
+/// Show or hide every island window in unison.
+/// Decision is based on the "main" window: if visible → hide all; if hidden → show all.
+fn toggle_all_islands(app: &tauri::AppHandle) {
+    let main_visible = app.get_webview_window("main")
+        .map(|w| w.is_visible().unwrap_or(false))
+        .unwrap_or(false);
+
+    for (label, win) in app.webview_windows() {
+        if !label.starts_with("island") && label != "main" { continue; }
+        if main_visible {
+            let _ = win.hide();
+        } else {
+            let _ = win.show();
+        }
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -552,12 +625,77 @@ pub fn run() {
                 win_sys::set_backdrop(hwnd_raw, 1); // 1 = auto/none
             }
 
-            // Initial position — top center
+            // ── Initial position — top center of primary monitor ──────────────
             if let Some(monitor) = win.current_monitor()? {
                 let scale = monitor.scale_factor();
                 let sw = monitor.size().width as f64 / scale;
                 let win_w = 164.0_f64;
                 win.set_position(tauri::LogicalPosition::new((sw - win_w) / 2.0, 0.0))?;
+            }
+
+            // ── Create one island window per secondary monitor ────────────────
+            // primary_monitor() returns the monitor the OS considers "main".
+            // We skip it because the "main" WebviewWindow (from tauri.conf.json)
+            // is already placed there above.
+            let primary_pos = app.primary_monitor()
+                .ok()
+                .flatten()
+                .map(|m| (m.position().x, m.position().y));
+
+            for (idx, monitor) in app.available_monitors()
+                .unwrap_or_default()
+                .iter()
+                .enumerate()
+            {
+                // Skip the primary monitor — already covered by "main"
+                let pos = (monitor.position().x, monitor.position().y);
+                if Some(pos) == primary_pos { continue; }
+
+                let label = format!("island_{}", idx);
+                let scale = monitor.scale_factor();
+                // Logical dimensions that match the default idle pill + MARGIN
+                let win_w = 164.0_f64 + 4.0;
+                let win_h = 64.0_f64 + 4.0;
+
+                match tauri::WebviewWindowBuilder::new(
+                    app,
+                    &label,
+                    tauri::WebviewUrl::App("index.html".into()),
+                )
+                .title("")
+                .inner_size(win_w, win_h)
+                .transparent(true)
+                .decorations(false)
+                .always_on_top(true)
+                .skip_taskbar(true)
+                .resizable(false)
+                .shadow(false)
+                .focused(false)
+                .visible(true)
+                .additional_browser_args(
+                    "--default-background-color=00000000 \
+                     --enable-features=msWebView2EnableDraggableRegions"
+                )
+                .build() {
+                    Ok(sec_win) => {
+                        // Position: top-center of this monitor (physical pixels)
+                        let mx = monitor.position().x;
+                        let my = monitor.position().y;
+                        let mw = monitor.size().width as i32;
+                        let pw = (win_w * scale) as i32;
+                        let _ = sec_win.set_position(tauri::PhysicalPosition::new(
+                            mx + (mw - pw) / 2,
+                            my,
+                        ));
+                        // Disable Mica on secondary windows too
+                        #[cfg(target_os = "windows")]
+                        if let Ok(hwnd) = sec_win.hwnd() {
+                            let hwnd_raw: isize = unsafe { std::mem::transmute_copy(&hwnd) };
+                            win_sys::set_backdrop(hwnd_raw, 1);
+                        }
+                    }
+                    Err(e) => eprintln!("[HaloW] Could not create window {}: {}", label, e),
+                }
             }
 
             // ── Tray icon + context menu ──────────────────────────────────────
@@ -576,35 +714,18 @@ pub fn run() {
                 .show_menu_on_left_click(false)
                 // ── Menu item selected ────────────────────────────────────────
                 .on_menu_event(|app, event| match event.id.as_ref() {
-                    "toggle" => {
-                        if let Some(win) = app.get_webview_window("main") {
-                            if win.is_visible().unwrap_or(false) {
-                                let _ = win.hide();
-                            } else {
-                                let _ = win.show();
-                                let _ = win.set_focus();
-                            }
-                        }
-                    }
-                    "quit" => app.exit(0),
-                    _ => {}
+                    "toggle" => toggle_all_islands(app),
+                    "quit"   => app.exit(0),
+                    _        => {}
                 })
                 // ── Tray icon click ───────────────────────────────────────────
                 .on_tray_icon_event(|tray, event| {
-                    // Left click toggles visibility
+                    // Left click toggles visibility of all islands
                     if let TrayIconEvent::Click {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up, ..
                     } = event {
-                        let app = tray.app_handle();
-                        if let Some(win) = app.get_webview_window("main") {
-                            if win.is_visible().unwrap_or(false) {
-                                let _ = win.hide();
-                            } else {
-                                let _ = win.show();
-                                let _ = win.set_focus();
-                            }
-                        }
+                        toggle_all_islands(tray.app_handle());
                     }
                     // Right click is handled by the menu automatically
                 })
@@ -632,6 +753,7 @@ pub fn run() {
             disable_theme_injection,
             is_injection_active,
             get_windows_theme,
+            get_window_monitor,
             resize_window,
             resize_anchor_bottom,
             snap_to_edge,

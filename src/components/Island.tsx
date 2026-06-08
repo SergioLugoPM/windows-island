@@ -85,7 +85,7 @@ const DIMS: Record<Mode, { w: number; h: number; r: number }> = {
   media:    { w: 350, h: 122, r: 28 },
   stats:    { w: 280, h: 110, r: 24 },
   full:     { w: 370, h: 158, r: 30 },
-  settings: { w: 310, h: 232, r: 28 },
+  settings: { w: 310, h: 192, r: 28 },
 };
 
 function getModeDims(mode: Mode, clockSize: ClockSize) {
@@ -105,11 +105,12 @@ async function resizeToMode(
   mode: Mode,
   clockSize: ClockSize = "M",
   _posMode: PositionMode = "top", // kept for call-site compat; bottom removed
+  label?: string,
 ) {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     const d = getModeDims(mode, clockSize);
-    await invoke("resize_window", { w: d.w + MARGIN, h: d.h + MARGIN });
+    await invoke("resize_window", { label, w: d.w + MARGIN, h: d.h + MARGIN });
   } catch { /* browser preview */ }
 }
 
@@ -124,17 +125,19 @@ async function snapToEdge(
   positionMode: PositionMode,
   mode: Mode,
   clockSize: ClockSize = "M",
+  label?: string,
 ): Promise<SnapEdge | null> {
   if (positionMode === "floating") return null;
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     const d = getModeDims(mode, clockSize);
-    await invoke("snap_to_edge", { edge: "top", w: d.w + MARGIN, h: d.h + MARGIN });
+    await invoke("snap_to_edge", { label, edge: "top", w: d.w + MARGIN, h: d.h + MARGIN });
     return "top";
   } catch { return null; }
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
+
 
 export function Island() {
   const [mode, setMode]           = useState<Mode>("idle");
@@ -144,11 +147,9 @@ export function Island() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [snapEdge, setSnapEdge]   = useState<SnapEdge>("top");
 
-  // Theme injection state
-  const [injectionActive, setInjectionActive] = useState(false);
-  const [selectedTheme, setSelectedTheme] = useState<'dark' | 'light' | 'vidrio'>('dark');
-  const [injectionLoading, setInjectionLoading] = useState(false);
-  const [injectionError, setInjectionError]     = useState<string | null>(null);
+  // This window's Tauri label (e.g. "main", "island_1") — stable ref for async callbacks.
+  const winLabelRef = useRef<string>("main");
+
 
   const idleAudio = useAudioVisualizer(isPlaying, 18);
 
@@ -164,13 +165,14 @@ export function Island() {
   // ── Persist settings ──
   useEffect(() => { saveSettings(settings); }, [settings]);
 
-  // ── Check initial injection state ──
+  // ── Identify this window's Tauri label ──
+  // Each secondary-monitor window has a label like "island_1", "island_2", etc.
+  // We store it in a ref so async edge-detection callbacks can route commands correctly.
   useEffect(() => {
-    if (isTauri) {
-      invoke<boolean>('is_injection_active')
-        .then(active => setInjectionActive(active))
-        .catch(err => console.error('Failed to check injection status:', err));
-    }
+    if (!isTauri) return;
+    import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
+      winLabelRef.current = getCurrentWindow().label;
+    });
   }, []);
 
   // ── Sync island theme with Windows system theme on startup ──
@@ -180,9 +182,9 @@ export function Island() {
       'get_windows_theme'
     ).then(({ is_dark }) => {
       // Only auto-set if user hasn't manually saved a preference
-      const saved = localStorage.getItem('halow-settings');
+      const saved = localStorage.getItem('island-settings');
       if (!saved) {
-        setSelectedTheme(is_dark ? 'dark' : 'light');
+        setSettings(s => ({ ...s, theme: is_dark ? 'dark' : 'light' }));
       }
     }).catch(() => {});
   }, []);
@@ -190,7 +192,7 @@ export function Island() {
   // ── Snap when positionMode changes ──
   useEffect(() => {
     if (settings.positionMode !== "floating") {
-      snapToEdge(settings.positionMode, mode, settings.clockSize).then(e => {
+      snapToEdge(settings.positionMode, mode, settings.clockSize, winLabelRef.current).then(e => {
         if (e) setSnapEdge(e);
       });
     }
@@ -199,7 +201,7 @@ export function Island() {
 
   // ── Resize idle window when clockSize changes (hot-reload dims) ──
   useEffect(() => {
-    if (mode === "idle") resizeToMode("idle", settings.clockSize, settings.positionMode);
+    if (mode === "idle") resizeToMode("idle", settings.clockSize, settings.positionMode, winLabelRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.clockSize]);
 
@@ -225,7 +227,7 @@ export function Island() {
   const scheduleCollapse = useCallback((ms = 3000) => {
     clearTimeout(collapseTimer.current);
     collapseTimer.current = setTimeout(() => {
-      resizeToMode("idle", settings.clockSize, settings.positionMode);
+      resizeToMode("idle", settings.clockSize, settings.positionMode, winLabelRef.current);
       setMode("idle");
       setOpacity(0.72);
       setLiq(0.4);
@@ -249,18 +251,33 @@ export function Island() {
 
     if (!isEdgeIdle) {
       // Ensure cursor events are on whenever not in passthrough state
-      coreMod.then(m => m.invoke("set_cursor_passthrough", { enabled: false })).catch(() => {});
+      const lbl = winLabelRef.current;
+      coreMod.then(m => m.invoke("set_cursor_passthrough", { label: lbl, enabled: false })).catch(() => {});
       return;
     }
 
+    const lbl = winLabelRef.current;
     let cancelled   = false;
     let passthrough = false;
     let expanding   = false;
     let infoReady = false;
     let scale     = 1;
+    let monY      = 0;
+    // Zone in PHYSICAL pixels: use window's actual outerPosition() so there is
+    // no DPI-coordinate mismatch between the JS monitor API and GetCursorPos.
+    let winLeft  = 0;
+    let winRight = 1920; // fallback — overwritten once infoReady
 
-    import("@tauri-apps/api/window").then(m => m.currentMonitor()).then(mon => {
-      if (mon) scale = mon.scaleFactor;
+    import("@tauri-apps/api/window").then(m => {
+      const win = m.getCurrentWindow();
+      return Promise.all([win.outerPosition(), m.currentMonitor()]);
+    }).then(([pos, mon]) => {
+      if (mon) {
+        scale = mon.scaleFactor;
+        monY  = mon.position.y;
+      }
+      winLeft  = pos.x;
+      winRight = pos.x + Math.round((IDLE_DIMS[settings.clockSize].w + MARGIN) * scale);
       infoReady = true;
     }).catch(() => { infoReady = true; });
 
@@ -268,7 +285,7 @@ export function Island() {
       if (on === passthrough) return;
       passthrough = on;
       const core = await coreMod;
-      await core.invoke("set_cursor_passthrough", { enabled: on }).catch(() => {});
+      await core.invoke("set_cursor_passthrough", { label: lbl, enabled: on }).catch(() => {});
     };
 
     // Enable passthrough immediately
@@ -278,11 +295,14 @@ export function Island() {
       if (cancelled || expanding || !infoReady) return;
       try {
         const core = await coreMod;
-        const [, cy] = await core.invoke<[number, number]>("get_cursor_screen_pos");
+        const [cx, cy] = await core.invoke<[number, number]>("get_cursor_screen_pos");
 
-        // Trigger when cursor is in the topmost 8 physical pixels of the screen
+        // Trigger when cursor is in the topmost 8 physical pixels AND within
+        // the window's physical-pixel X span. winLeft/winRight come from
+        // outerPosition(), which is always in physical pixels — same system
+        // as GetCursorPos — so there is no DPI-scale mismatch.
         const TOP_PX = Math.round(8 * scale);
-        const atEdge = cy < TOP_PX;
+        const atEdge = cy < monY + TOP_PX && cx >= winLeft && cx < winRight;
 
         if (atEdge && passthrough) {
           expanding = true;
@@ -291,14 +311,12 @@ export function Island() {
             if (cancelled) return;
             setOpacity(1);
             setLiq(0.65);
-            await resizeToMode("peek", settings.clockSize, settings.positionMode);
+            await resizeToMode("peek", settings.clockSize, settings.positionMode, lbl);
             setMode("peek");
-            // Safety net: if mouseenter/mouseleave never fire (cursor moved away
-            // before the island appeared, or GetCursorPos false-positive),
-            // collapse automatically after 4 s so the island doesn't stay stuck.
+            // Safety net: collapse after 4 s if mouseenter never fires
             clearTimeout(collapseTimer.current);
             collapseTimer.current = setTimeout(() => {
-              resizeToMode("idle", settings.clockSize, settings.positionMode);
+              resizeToMode("idle", settings.clockSize, settings.positionMode, lbl);
               setMode("idle");
               setOpacity(0.72);
               setLiq(0.4);
@@ -316,7 +334,7 @@ export function Island() {
     return () => {
       cancelled = true;
       clearInterval(id);
-      coreMod.then(m => m.invoke("set_cursor_passthrough", { enabled: false })).catch(() => {});
+      coreMod.then(m => m.invoke("set_cursor_passthrough", { label: lbl, enabled: false })).catch(() => {});
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, settings.positionMode, settings.clockSize]);
@@ -334,7 +352,7 @@ export function Island() {
     setLiq(0.65);
     if (mode === "idle") {
       hoverTimer.current = setTimeout(async () => {
-        await resizeToMode("peek", settings.clockSize, settings.positionMode);
+        await resizeToMode("peek", settings.clockSize, settings.positionMode, winLabelRef.current);
         setMode("peek");
       }, 180);
     }
@@ -372,7 +390,7 @@ export function Island() {
         const idx = CYCLE.indexOf(prev as Exclude<Mode, "idle" | "settings">);
         return CYCLE[(idx + 1) % CYCLE.length];
       })();
-      resizeToMode(nextMode, settings.clockSize, settings.positionMode);
+      resizeToMode(nextMode, settings.clockSize, settings.positionMode, winLabelRef.current);
       return nextMode;
     });
 
@@ -405,7 +423,7 @@ export function Island() {
     longPressTimer.current = setTimeout(async () => {
       if (!isDragging.current) {
         cancelCollapse();
-        await resizeToMode("settings", settings.clockSize, settings.positionMode);
+        await resizeToMode("settings", settings.clockSize, settings.positionMode, winLabelRef.current);
         setMode("settings");
         scheduleCollapse(8000);
       }
@@ -418,7 +436,7 @@ export function Island() {
     clearTimeout(longPressTimer.current);
     if (isDragging.current) {
       if (settings.positionMode !== "floating") {
-        const edge = await snapToEdge(settings.positionMode, mode, settings.clockSize);
+        const edge = await snapToEdge(settings.positionMode, mode, settings.clockSize, winLabelRef.current);
         if (edge) setSnapEdge(edge);
       }
       isDragging.current = false;
@@ -429,7 +447,7 @@ export function Island() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        resizeToMode("idle", settings.clockSize, settings.positionMode);
+        resizeToMode("idle", settings.clockSize, settings.positionMode, winLabelRef.current);
         setMode("idle");
         cancelCollapse();
       }
@@ -444,49 +462,6 @@ export function Island() {
   const setPeekContent  = (v: PeekContent)  => setSettings(s => ({ ...s, peekContent: v }));
   const setTheme        = (v: Theme)        => setSettings(s => ({ ...s, theme: v }));
   const setClockSize    = (v: ClockSize)    => setSettings(s => ({ ...s, clockSize: v }));
-
-  // ── Theme change handler (injection) ──
-  // Centralizes theme selection so the injected DLL gets refreshed live.
-  // The Rust `update_injected_theme` command only accepts "dark" | "light";
-  // "vidrio" maps to the dark config for IPC purposes.
-  const handleThemeChange = async (newTheme: 'dark' | 'light' | 'vidrio') => {
-    setSelectedTheme(newTheme);
-
-    if (injectionActive) {
-      try {
-        const configName = newTheme === 'vidrio' ? 'dark' : newTheme;
-        // Update the theme in the IPC server
-        await invoke('update_injected_theme', { configName });
-        // Signal the DLL to refresh its cached config
-        await invoke('refresh_injected_theme_config');
-      } catch (error) {
-        console.error('Failed to update theme:', error);
-        alert('Failed to update theme');
-      }
-    }
-  };
-
-  // ── Theme injection handler ──
-  const handleToggleInjection = async () => {
-    if (!isTauri) return;
-    setInjectionLoading(true);
-    setInjectionError(null);
-    try {
-      if (!injectionActive) {
-        await invoke('enable_theme_injection', { themeName: selectedTheme });
-        setInjectionActive(true);
-      } else {
-        await invoke('disable_theme_injection');
-        setInjectionActive(false);
-      }
-    } catch (error) {
-      const msg = String(error);
-      setInjectionError(msg);
-      console.error('Injection toggle failed:', msg);
-    } finally {
-      setInjectionLoading(false);
-    }
-  };
 
   const cycleIndex = CYCLE.indexOf(mode as Exclude<Mode, "idle" | "settings">);
 
@@ -573,7 +548,7 @@ export function Island() {
                 style={{ display: "flex", alignItems: "center", gap: 14, width: "100%" }}
               >
                 <Clock variant="expanded" format={settings.clockFormat} />
-                <div style={{ width: 1, height: 28, background: "rgba(80,100,200,0.2)", flexShrink: 0 }} />
+                <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.10)", flexShrink: 0 }} />
                 {settings.peekContent === "weather" && <WeatherView compact />}
                 {settings.peekContent === "media"   && <MediaMini />}
                 {settings.peekContent === "stats"   && <StatsMini />}
@@ -617,10 +592,10 @@ export function Island() {
               >
                 <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                   <Clock variant="expanded" format={settings.clockFormat} />
-                  <div style={{ width: 1, height: 32, background: "rgba(80,100,200,0.2)", flexShrink: 0 }} />
+                  <div style={{ width: 1, height: 32, background: "rgba(255,255,255,0.10)", flexShrink: 0 }} />
                   <WeatherView compact />
                 </div>
-                <div style={{ height: 1, background: "linear-gradient(90deg,transparent,rgba(80,100,200,0.2),transparent)" }} />
+                <div style={{ height: 1, background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.09),transparent)" }} />
                 <MediaCompact />
               </motion.div>
             )}
@@ -698,77 +673,7 @@ export function Island() {
                     </div>
                   </div>
 
-                  {/* Theme Injection */}
-                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(80,100,200,0.2)' }}>
-                    <div style={{ fontSize: 11, fontWeight: 'bold', color: 'rgba(180,190,220,0.9)', marginBottom: 8 }}>
-                      🧪 Theme Injection (Experimental)
-                    </div>
-
-                    <div style={{ marginBottom: 8 }}>
-                      <span style={{ fontSize: 10, color: 'rgba(120,140,180,0.8)', display: 'block', marginBottom: 4 }}>
-                        Tema:
-                      </span>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {(['dark', 'light', 'vidrio'] as const).map(theme => (
-                          <label key={theme} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9 }}>
-                            <input
-                              type="radio"
-                              name="injectionTheme"
-                              value={theme}
-                              checked={selectedTheme === theme}
-                              onChange={(e) => { e.stopPropagation(); handleThemeChange(theme); }}
-                              disabled={injectionLoading}
-                              style={{ transform: 'scale(0.8)' }}
-                            />
-                            <span style={{ textTransform: 'capitalize', color: 'rgba(160,170,200,0.9)' }}>
-                              {theme === 'vidrio' ? 'Vidrio' : theme === 'light' ? 'Claro' : 'Oscuro'}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleToggleInjection(); }}
-                      disabled={injectionLoading}
-                      style={{
-                        padding: '6px 12px',
-                        backgroundColor: injectionActive ? '#ff6b6b' : '#51cf66',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '3px',
-                        cursor: injectionLoading ? 'not-allowed' : 'pointer',
-                        opacity: injectionLoading ? 0.6 : 1,
-                        fontSize: 10,
-                        fontWeight: 'bold',
-                        marginBottom: 6,
-                        width: '100%'
-                      }}
-                    >
-                      {injectionLoading ? 'Cargando...' : injectionActive ? 'Desactivar Injection' : 'Activar Injection'}
-                    </button>
-
-                    <div style={{ fontSize: 8, color: 'rgba(100,120,160,0.6)', textAlign: 'center' }}>
-                      Estado: {injectionActive ? '✓ Activo' : '○ Inactivo'}
-                    </div>
-
-                    {injectionError && (
-                      <div style={{
-                        fontSize: 8,
-                        color: '#ff6b6b',
-                        textAlign: 'center',
-                        marginTop: 4,
-                        lineHeight: 1.3,
-                        padding: '3px 4px',
-                        background: 'rgba(255,60,60,0.08)',
-                        borderRadius: 4,
-                      }}>
-                        ⚠ {injectionError}
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ fontSize: 9, color: "rgba(100,120,180,0.4)", textAlign: "center", marginTop: 8 }}>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.26)", textAlign: "center", marginTop: 8 }}>
                     mantén presionado · Esc para cerrar
                   </div>
                 </div>
