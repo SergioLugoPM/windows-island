@@ -162,6 +162,7 @@ export function Island() {
   const collapseTimer  = useRef<ReturnType<typeof setTimeout>>();
   const burstTimer     = useRef<ReturnType<typeof setTimeout>>();
   const isDragging     = useRef(false); // vestigial: dragging removed in 0a1e2ae; guard kept for handleClick / future re-introduction
+  const justEnteredSettingsRef = useRef(false);
 
   // Effective dims for the current mode + clock size
   const dims = getModeDims(mode, settings.clockSize);
@@ -406,6 +407,10 @@ export function Island() {
   // ── Click: cycle modes ──
   const handleClick = useCallback(async () => {
     if (isDragging.current) return;
+    if (justEnteredSettingsRef.current) {
+      justEnteredSettingsRef.current = false;
+      return;
+    }
     cancelCollapse();
 
     pulseControls.start({
@@ -476,6 +481,7 @@ export function Island() {
 
     longPressTimer.current = setTimeout(async () => {
       cancelCollapse();
+      justEnteredSettingsRef.current = true;
       await resizeToMode("settings", settings.clockSize, settings.positionMode, winLabelRef.current);
       setMode("settings");
       scheduleCollapse(8000);
