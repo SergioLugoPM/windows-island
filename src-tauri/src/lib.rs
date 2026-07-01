@@ -1,4 +1,5 @@
 pub mod cpu_temp;
+pub mod gpu_stats;
 pub mod i18n;
 pub mod injection;
 pub mod injector;
@@ -526,6 +527,8 @@ async fn skip_previous() -> Result<(), String> { media::skip_previous().await }
 
 #[tauri::command]
 fn get_system_stats(state: State<'_, AppState>) -> stats::SystemStats {
+    #[cfg(target_os = "windows")]
+    eprintln!("[SPIKE gpu] {:?}", gpu_stats::read_gpu_percent());
     stats::collect(&state.stats)
 }
 
