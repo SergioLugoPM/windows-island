@@ -128,7 +128,9 @@ export function MediaFull() {
 
   return (
     <div className="media-vinyl-layout">
-      <Vinyl isPlaying={info.is_playing} idleSpin={!info.has_session} size={64} />
+      <div style={{ marginLeft: -90, flexShrink: 0 }}>
+        <Vinyl isPlaying={info.is_playing} idleSpin={!info.has_session} size={200} />
+      </div>
 
       <div className="media-vinyl-right">
         <div className="media-vinyl-meta">
