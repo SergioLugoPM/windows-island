@@ -126,16 +126,11 @@ export function MediaFull() {
   if (!info.has_session) {
     return (
       <div style={{ display: "flex", alignItems: "center", gap: 14, width: "100%" }}>
-        <div style={{
-          width: 64, height: 64, borderRadius: "50%", flexShrink: 0,
-          border: "2px dashed rgba(255,255,255,0.18)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 22, color: "rgba(255,255,255,0.25)",
-        }}>
+        <div className="media-empty-icon">
           ♪
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <span className="media-title" style={{ color: "rgba(255,255,255,0.75)" }}>
+          <span className="media-title">
             {t("noMedia")}
           </span>
           <span className="empty-label" style={{ fontSize: 10 }}>
