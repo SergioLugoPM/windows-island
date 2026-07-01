@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import { Clock, type ClockFormat } from "./Clock";
-import { MediaMini, MediaFull, MediaCompact } from "./MediaView";
-import { StatsFull, StatsMini } from "./StatsView";
+import { MediaFull, MediaCompact } from "./MediaView";
+import { StatsFull } from "./StatsView";
 import { WeatherView } from "./WeatherView";
 import { AudioVisualizer } from "./AudioVisualizer";
 import { useAudioVisualizer } from "../hooks/useAudioVisualizer";
@@ -12,7 +12,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Mode = "idle" | "peek" | "media" | "stats" | "weather" | "full" | "settings";
+type Mode = "idle" | "media" | "stats" | "weather" | "full" | "settings";
 
 /** "top" = snapped to top edge (cursor must reach screen top to activate).
  *  "floating" = free drag, always reacts to hover. */
@@ -29,14 +29,12 @@ function edgeRadius(r: number, edge: SnapEdge): string {
   }
 }
 
-export type PeekContent = "weather" | "media" | "stats";
 export type Theme       = "dark" | "light";
 export type ClockSize   = "S" | "M" | "L";
 
 interface Settings {
   clockFormat:  ClockFormat;
   positionMode: PositionMode;
-  peekContent:  PeekContent;
   theme:        Theme;
   clockSize:    ClockSize;
   showSeconds:  boolean;
@@ -46,7 +44,6 @@ function defaultSettings(): Settings {
   return {
     clockFormat:  "24h",
     positionMode: "top",
-    peekContent:  "weather",
     theme:        "dark",
     clockSize:    "M",
     showSeconds:  false,
@@ -91,7 +88,6 @@ const EXPANDED_DIMS = { w: 420, h: 280, r: 26 };
 
 const DIMS: Record<Mode, { w: number; h: number; r: number }> = {
   idle:     { w: 160, h: 64,  r: 32 },
-  peek:     EXPANDED_DIMS,
   media:    EXPANDED_DIMS,
   stats:    EXPANDED_DIMS,
   weather:  EXPANDED_DIMS,
@@ -103,7 +99,7 @@ function getModeDims(mode: Mode, clockSize: ClockSize) {
   return mode === "idle" ? IDLE_DIMS[clockSize] : DIMS[mode];
 }
 
-const CYCLE: Mode[] = ["peek", "media", "stats", "weather", "full"];
+const CYCLE: Mode[] = ["full", "media", "stats", "weather"];
 const spring     = { type: "spring" as const, stiffness: 480, damping: 36, mass: 0.75 };
 const springFast = { type: "spring" as const, stiffness: 600, damping: 38, mass: 0.6 };
 
@@ -346,8 +342,8 @@ export function Island() {
             if (cancelled) return;
             setOpacity(1);
             setLiq(0.65);
-            await resizeToMode("peek", settings.clockSize, settings.positionMode, lbl);
-            setMode("peek");
+            await resizeToMode("full", settings.clockSize, settings.positionMode, lbl);
+            setMode("full");
             // Safety net: collapse after 4 s if mouseenter never fires
             clearTimeout(collapseTimer.current);
             collapseTimer.current = setTimeout(() => {
@@ -387,8 +383,8 @@ export function Island() {
     setLiq(0.65);
     if (mode === "idle") {
       hoverTimer.current = setTimeout(async () => {
-        await resizeToMode("peek", settings.clockSize, settings.positionMode, winLabelRef.current);
-        setMode("peek");
+        await resizeToMode("full", settings.clockSize, settings.positionMode, winLabelRef.current);
+        setMode("full");
       }, 180);
     }
   }, [mode, settings.positionMode, settings.clockSize, cancelCollapse]);
@@ -507,7 +503,6 @@ export function Island() {
 
   // ── Settings updaters ──
   const setClockFormat  = (v: ClockFormat)  => setSettings(s => ({ ...s, clockFormat: v }));
-  const setPeekContent  = (v: PeekContent)  => setSettings(s => ({ ...s, peekContent: v }));
   const setTheme        = (v: Theme)        => setSettings(s => ({ ...s, theme: v }));
   const setClockSize    = (v: ClockSize)    => setSettings(s => ({ ...s, clockSize: v }));
   const setShowSeconds  = (v: boolean)      => setSettings(s => ({ ...s, showSeconds: v }));
@@ -584,23 +579,6 @@ export function Island() {
                     color={[80, 130, 255]}
                   />
                 )}
-              </motion.div>
-            )}
-
-            {/* ── PEEK ── */}
-            {mode === "peek" && (
-              <motion.div key="peek"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={springFast}
-                style={{ display: "flex", alignItems: "center", gap: 24, width: "100%", height: "100%", justifyContent: "center" }}
-              >
-                <Clock variant="expanded" format={settings.clockFormat} />
-                <div style={{ width: 1, height: 60, background: "rgba(255,255,255,0.10)", flexShrink: 0 }} />
-                {settings.peekContent === "weather" && <WeatherView compact />}
-                {settings.peekContent === "media"   && <MediaMini />}
-                {settings.peekContent === "stats"   && <StatsMini />}
               </motion.div>
             )}
 
@@ -717,19 +695,6 @@ export function Island() {
                         onClick={(e) => { e.stopPropagation(); setTheme("dark"); }}>Oscuro</button>
                       <button className={`settings-opt ${settings.theme === "light" ? "active" : ""}`}
                         onClick={(e) => { e.stopPropagation(); setTheme("light"); }}>Claro</button>
-                    </div>
-                  </div>
-
-                  {/* Contenido del hover */}
-                  <div className="settings-row">
-                    <span className="settings-label">Hover</span>
-                    <div className="settings-toggle">
-                      <button className={`settings-opt ${settings.peekContent === "weather" ? "active" : ""}`}
-                        onClick={(e) => { e.stopPropagation(); setPeekContent("weather"); }}>Clima</button>
-                      <button className={`settings-opt ${settings.peekContent === "media" ? "active" : ""}`}
-                        onClick={(e) => { e.stopPropagation(); setPeekContent("media"); }}>Música</button>
-                      <button className={`settings-opt ${settings.peekContent === "stats" ? "active" : ""}`}
-                        onClick={(e) => { e.stopPropagation(); setPeekContent("stats"); }}>Sistema</button>
                     </div>
                   </div>
 
