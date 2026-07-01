@@ -79,6 +79,23 @@ mod win_sys {
         ) -> i32;
         // Send a message to all top-level windows (HWND_BROADCAST = 0xFFFF)
         fn SendNotifyMessageW(hwnd: isize, msg: u32, wparam: usize, lparam: isize) -> i32;
+        fn DwmEnableBlurBehindWindow(hwnd: isize, p_blur_behind: *const DwmBlurBehind) -> i32;
+    }
+
+    #[repr(C)]
+    pub struct DwmBlurBehind {
+        pub dw_flags: u32,
+        pub f_enable: i32,
+        pub h_rgn_blur: isize,
+        pub f_transition_on_maximized: i32,
+    }
+
+    #[link(name = "gdi32")]
+    extern "system" {
+        fn CreateRoundRectRgn(
+            x1: i32, y1: i32, x2: i32, y2: i32,
+            cx_corner: i32, cy_corner: i32,
+        ) -> isize;
     }
 
     /// Apply a dark or light theme by writing directly to the Windows system
@@ -147,6 +164,27 @@ mod win_sys {
                 std::mem::size_of::<u32>() as u32,
             );
         }
+    }
+
+    /// Enable blur-behind clipped to a rounded-rectangle region matching the
+    /// window's current pill shape. `w`/`h`/`radius` are PHYSICAL pixels.
+    ///
+    /// SAFETY / OWNERSHIP: once passed to DwmEnableBlurBehindWindow, the
+    /// system takes ownership of the HRGN — do NOT call DeleteObject on it
+    /// afterward (same rule as SetWindowRgn).
+    pub fn enable_blur_behind(hwnd_isize: isize, w: i32, h: i32, radius: i32) -> bool {
+        const DWM_BB_ENABLE: u32 = 0x1;
+        const DWM_BB_BLURREGION: u32 = 0x2;
+        let hrgn = unsafe { CreateRoundRectRgn(0, 0, w, h, radius * 2, radius * 2) };
+        if hrgn == 0 { return false; }
+        let bb = DwmBlurBehind {
+            dw_flags: DWM_BB_ENABLE | DWM_BB_BLURREGION,
+            f_enable: 1,
+            h_rgn_blur: hrgn,
+            f_transition_on_maximized: 0,
+        };
+        let hr = unsafe { DwmEnableBlurBehindWindow(hwnd_isize, &bb) };
+        hr == 0 // S_OK
     }
 
     pub fn cursor_pos() -> (i32, i32) {
@@ -666,6 +704,15 @@ pub fn run() {
             if let Ok(hwnd) = win.hwnd() {
                 let hwnd_raw: isize = unsafe { std::mem::transmute_copy(&hwnd) };
                 win_sys::set_backdrop(hwnd_raw, 1); // 1 = auto/none
+
+                // ── SPIKE: DwmEnableBlurBehindWindow go/no-go test ──────────
+                // Unlike Mica, blur-behind is clipped via an HRGN, so it can
+                // respect the pill's rounded shape. Purely additive/one-shot;
+                // remove this block entirely if the spike is rejected.
+                if let Ok(size) = win.inner_size() {
+                    let ok = win_sys::enable_blur_behind(hwnd_raw, size.width as i32, size.height as i32, 32);
+                    eprintln!("[SPIKE] blur-behind enable result: {}", ok);
+                }
             }
 
             // ── Initial position — top center of primary monitor ──────────────
