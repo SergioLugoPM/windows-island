@@ -161,7 +161,7 @@ export function Island() {
   const hoverTimer     = useRef<ReturnType<typeof setTimeout>>();
   const collapseTimer  = useRef<ReturnType<typeof setTimeout>>();
   const burstTimer     = useRef<ReturnType<typeof setTimeout>>();
-  const isDragging     = useRef(false);
+  const isDragging     = useRef(false); // vestigial: dragging removed in 0a1e2ae; guard kept for handleClick / future re-introduction
 
   // Effective dims for the current mode + clock size
   const dims = getModeDims(mode, settings.clockSize);
