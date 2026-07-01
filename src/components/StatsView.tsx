@@ -64,6 +64,11 @@ function colorForLoad(p: number): string {
   return "rgba(255,110,110,0.95)";
 }
 
+function formatKbps(kbps: number): string {
+  if (kbps < 1024) return `${kbps.toFixed(0)} KB/s`;
+  return `${(kbps / 1024).toFixed(1)} MB/s`;
+}
+
 // ─── Full view — used as a dedicated cycle mode ──────────────────────────
 
 export function StatsFull() {
@@ -97,6 +102,18 @@ export function StatsFull() {
           }
         />
       )}
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "baseline",
+        fontFamily: "-apple-system,'SF Pro Text','Segoe UI',system-ui,sans-serif",
+      }}>
+        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: 0.5, color: "rgba(140,170,220,0.7)" }}>
+          {t("network")}
+        </span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(220,230,255,0.95)", fontVariantNumeric: "tabular-nums" }}>
+          ↓ {formatKbps(s.net_down_kbps)}
+          <span style={{ marginLeft: 8 }}>↑ {formatKbps(s.net_up_kbps)}</span>
+        </span>
+      </div>
     </div>
   );
 }
@@ -135,6 +152,14 @@ export function StatsMini() {
     <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
       <MiniLine label="CPU" pct={s.cpu_percent} color={colorForLoad(s.cpu_percent)} />
       <MiniLine label="RAM" pct={s.ram_percent} color={colorForLoad(s.ram_percent)} />
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 9, fontWeight: 600, color: "rgba(140,170,220,0.65)", letterSpacing: 0.4, width: 22 }}>
+          NET
+        </span>
+        <span style={{ fontSize: 9, fontWeight: 600, color: "rgba(220,230,255,0.9)", fontVariantNumeric: "tabular-nums" }}>
+          ↓{formatKbps(s.net_down_kbps)} ↑{formatKbps(s.net_up_kbps)}
+        </span>
+      </div>
     </div>
   );
 }

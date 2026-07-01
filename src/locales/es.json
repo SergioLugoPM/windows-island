@@ -3,6 +3,7 @@
   "ram": "RAM",
   "battery": "BAT",
   "charging": "⚡ cargando",
+  "network": "RED",
   "weather": "Clima",
   "settings": "Configuración",
   "hide": "Ocultar",

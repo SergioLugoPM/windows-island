@@ -3,6 +3,7 @@
   "ram": "RAM",
   "battery": "BAT",
   "charging": "⚡ charging",
+  "network": "NET",
   "weather": "Weather",
   "settings": "Settings",
   "hide": "Hide",
