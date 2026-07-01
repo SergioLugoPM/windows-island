@@ -770,48 +770,6 @@
    caustic light patterns, oval specular highlight.
    ══════════════════════════════════════════════════════ */
 
-/* ─── Glass base — semi-transparent dark glass (no Mica: avoids corner artifacts) ─── */
-.theme-glass .island-glass {
-  background: rgba(12, 16, 28, 0.48);
-  border: none;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
-    inset 0 0 40px rgba(180, 210, 255, 0.06);  /* soft inner light haze */
-}
-
-/* Subtle ambient tint breathe */
-.theme-glass .island-glass::before {
-  background:
-    radial-gradient(ellipse 110% 70% at 28% 25%, rgba(180,210,255,0.10) 0%, transparent 65%),
-    radial-gradient(ellipse 80% 110% at 72% 75%, rgba(220,180,255,0.07) 0%, transparent 60%);
-  animation: glass-ambient 14s ease-in-out infinite alternate;
-}
-
-/* Very subtle light streak */
-.theme-glass .island-glass::after {
-  background: linear-gradient(
-    112deg,
-    transparent 20%,
-    rgba(255,255,255,0.04) 42%,
-    rgba(255,255,255,0.10) 50%,
-    rgba(255,255,255,0.04) 58%,
-    transparent 80%
-  );
-  animation: glass-streak-anim 10s ease-in-out infinite;
-}
-
-@keyframes glass-ambient {
-  0%   { opacity: 0.5; }
-  100% { opacity: 1.0; }
-}
-@keyframes glass-streak-anim {
-  0%   { left: -80%; opacity: 0; }
-  10%  { opacity: 1; }
-  90%  { opacity: 1; }
-  100% { left: 160%; opacity: 0; }
-}
-
 /* ─── Chrome wrapper — clips everything to pill border-radius ─── */
 .glass-chrome-wrapper {
   position: absolute;
@@ -958,9 +916,6 @@
   filter: url(#glass-caustic) blur(5px);
 }
 
-/* Override the inline filter from JSX (specificity wins) */
-.theme-glass .glass-caustics { filter: url(#glass-caustic) blur(5px); }
-
 @keyframes glass-caustics-drift {
   0%   { transform: translate(0px,  0px) scale(1.00); opacity: 0.7; }
   25%  { transform: translate(3px, -2px) scale(1.04); opacity: 1.0; }
@@ -1004,125 +959,6 @@
     inset 0 -2px 8px rgba(0, 0, 0, 0.14),
     inset 2px 0 4px rgba(0, 0, 0, 0.04),
     inset -2px 0 4px rgba(0, 0, 0, 0.04);
-}
-
-/* ─── Glass text — white with strong shadow for readability over desktop ─── */
-.theme-glass .clock-idle-time {
-  color: rgba(255, 255, 255, 0.97);
-  text-shadow: 0 1px 6px rgba(0,0,0,0.80), 0 0 16px rgba(0,0,0,0.40);
-}
-.theme-glass .clock-idle-ampm {
-  color: rgba(255, 255, 255, 0.55);
-  text-shadow: 0 1px 3px rgba(0,0,0,0.45);
-}
-.theme-glass .clock-idle-date {
-  color: rgba(255, 255, 255, 0.45);
-  text-shadow: 0 1px 3px rgba(0,0,0,0.45);
-}
-.theme-glass .clock-compact {
-  color: rgba(255, 255, 255, 0.96);
-  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-}
-.theme-glass .clock-dot {
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 0 6px rgba(255,255,255,0.5);
-}
-.theme-glass .clock-time-big {
-  color: rgba(255, 255, 255, 0.97);
-  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
-}
-.theme-glass .clock-date {
-  color: rgba(255, 255, 255, 0.58);
-}
-.theme-glass .media-title {
-  color: rgba(255, 255, 255, 0.95);
-  text-shadow: 0 1px 3px rgba(0,0,0,0.45);
-}
-.theme-glass .media-artist {
-  color: rgba(255, 255, 255, 0.58);
-}
-.theme-glass .media-btn {
-  color: rgba(255, 255, 255, 0.72);
-}
-.theme-glass .media-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.97);
-}
-.theme-glass .media-art {
-  background: linear-gradient(135deg, rgba(255,255,255,0.12), rgba(200,220,255,0.10));
-  border-color: rgba(255,255,255,0.18);
-}
-.theme-glass .media-progress {
-  background: rgba(255, 255, 255, 0.15);
-}
-.theme-glass .media-progress-fill {
-  background: linear-gradient(90deg, rgba(255,255,255,0.65), rgba(210,235,255,0.85));
-  box-shadow: 0 0 6px rgba(255,255,255,0.35);
-}
-.theme-glass .weather-temp {
-  color: rgba(255, 255, 255, 0.96);
-  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
-}
-.theme-glass .weather-desc,
-.theme-glass .weather-city {
-  color: rgba(255, 255, 255, 0.58);
-}
-.theme-glass .empty-label {
-  color: rgba(255, 255, 255, 0.45);
-}
-
-/* ─── Glass settings ─── */
-.theme-glass .settings-title {
-  color: rgba(255, 255, 255, 0.45);
-}
-.theme-glass .settings-label {
-  color: rgba(255, 255, 255, 0.80);
-}
-.theme-glass .settings-toggle {
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255,255,255,0.10);
-}
-.theme-glass .settings-opt {
-  color: rgba(255, 255, 255, 0.50);
-  font-size: 9px;      /* 3 buttons: a touch smaller */
-  padding: 3px 6px;
-}
-.theme-glass .settings-opt.active {
-  background: rgba(255, 255, 255, 0.18);
-  color: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 0 8px rgba(255,255,255,0.10);
-}
-
-/* ─── Glass mode dots ─── */
-.theme-glass .mode-dot {
-  background: rgba(255, 255, 255, 0.22);
-}
-.theme-glass .mode-dot.active {
-  background: rgba(255, 255, 255, 0.90);
-  box-shadow: 0 0 5px rgba(255,255,255,0.55);
-}
-
-/* ─── Glass boom rings — white instead of blue ─── */
-.theme-glass .boom-ring {
-  animation: glass-boom-pulse 3.2s ease-out infinite;
-}
-.theme-glass .boom-ring-2 { animation-delay: 1.07s; }
-.theme-glass .boom-ring-3 { animation-delay: 2.14s; }
-
-@keyframes glass-boom-pulse {
-  0%  { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.45); opacity: 0.9; }
-  60% { box-shadow: inset 0 0 0 10px rgba(255,255,255,0.00); opacity: 0.4; }
-  100%{ box-shadow: inset 0 0 0 18px rgba(255,255,255,0.00); opacity: 0;   }
-}
-
-/* ─── Glass pulse ring ─── */
-.theme-glass .island-pulse {
-  border-color: rgba(255, 255, 255, 0.45);
-}
-
-/* ─── Glass dividers ─── */
-.theme-glass .full-divider {
-  background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.18), transparent);
 }
 
 /* ─── Weather animated backdrop ─── */

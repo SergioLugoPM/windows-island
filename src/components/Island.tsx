@@ -7,7 +7,6 @@ import { WeatherView } from "./WeatherView";
 import { AudioVisualizer } from "./AudioVisualizer";
 import { useAudioVisualizer } from "../hooks/useAudioVisualizer";
 import { LiquidBackground } from "./LiquidBackground";
-import { LiquidGlassChrome } from "./LiquidGlassChrome";
 import { isTauri } from "../App";
 import { invoke } from '@tauri-apps/api/core';
 
@@ -31,7 +30,7 @@ function edgeRadius(r: number, edge: SnapEdge): string {
 }
 
 export type PeekContent = "weather" | "media" | "stats";
-export type Theme       = "dark" | "light" | "glass";
+export type Theme       = "dark" | "light";
 export type ClockSize   = "S" | "M" | "L";
 
 interface Settings {
@@ -59,6 +58,8 @@ function loadSettings(): Settings {
       const parsed = JSON.parse(raw) as Partial<Settings>;
       // Migrate removed "bottom" mode to "top"
       if ((parsed.positionMode as string) === "bottom") parsed.positionMode = "top";
+      // Migrate removed "glass" theme to "dark"
+      if ((parsed.theme as string) === "glass") parsed.theme = "dark";
       return { ...defaultSettings(), ...parsed };
     }
   } catch { /* ignore */ }
@@ -525,7 +526,6 @@ export function Island() {
         )}
 
         <LiquidBackground intensity={liqIntensity} />
-        {settings.theme === "glass" && <LiquidGlassChrome intensity={liqIntensity} />}
 
         {/* Click pulse ring */}
         <motion.div
@@ -680,8 +680,6 @@ export function Island() {
                         onClick={(e) => { e.stopPropagation(); setTheme("dark"); }}>Oscuro</button>
                       <button className={`settings-opt ${settings.theme === "light" ? "active" : ""}`}
                         onClick={(e) => { e.stopPropagation(); setTheme("light"); }}>Claro</button>
-                      <button className={`settings-opt ${settings.theme === "glass" ? "active" : ""}`}
-                        onClick={(e) => { e.stopPropagation(); setTheme("glass"); }}>Vidrio</button>
                     </div>
                   </div>
 
