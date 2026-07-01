@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { WeatherBackdrop } from "./WeatherBackdrop";
+import { WeatherIcon } from "./WeatherIcon";
 
 export interface WeatherInfo {
   temp_c: number;
@@ -9,22 +10,6 @@ export interface WeatherInfo {
   humidity: number;
   feels_like_c: number;
   wind_kmph: number;
-}
-
-const WEATHER_ICONS: Record<string, string> = {
-  "113": "☀️", "116": "⛅", "119": "☁️", "122": "☁️",
-  "143": "🌫️", "176": "🌦️", "179": "🌨️", "182": "🌧️",
-  "185": "🌧️", "200": "⛈️", "227": "❄️", "230": "❄️",
-  "248": "🌫️", "260": "🌫️", "263": "🌦️", "266": "🌦️",
-  "281": "🌧️", "284": "🌧️", "293": "🌧️", "296": "🌧️",
-  "299": "🌧️", "302": "🌧️", "305": "🌧️", "308": "🌧️",
-  "311": "🌨️", "314": "🌨️", "317": "🌨️", "320": "🌨️",
-  "353": "🌦️", "356": "🌧️", "359": "🌧️", "386": "⛈️",
-  "389": "⛈️", "392": "⛈️", "395": "❄️",
-};
-
-function getIcon(code: string): string {
-  return WEATHER_ICONS[code] ?? "🌡️";
 }
 
 async function fetchWeather(city: string): Promise<WeatherInfo | null> {
@@ -75,7 +60,7 @@ export function WeatherView({ city = "auto", compact = false }: Props) {
   if (compact) {
     return (
       <div className="weather-row">
-        <span style={{ fontSize: 48, lineHeight: 1, flexShrink: 0 }}>{getIcon(weather.icon_code)}</span>
+        <WeatherIcon iconCode={weather.icon_code} size={40} />
         <span className="weather-temp" style={{ fontSize: 28 }}>
           {weather.temp_c}°
         </span>
@@ -87,7 +72,7 @@ export function WeatherView({ city = "auto", compact = false }: Props) {
     <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", position: "relative" }}>
       <WeatherBackdrop iconCode={weather.icon_code} />
       <div className="weather-row" style={{ position: "relative", zIndex: 1 }}>
-        <div className="weather-icon">{getIcon(weather.icon_code)}</div>
+        <div className="weather-icon"><WeatherIcon iconCode={weather.icon_code} size={42} /></div>
         <div className="weather-info">
           <div className="weather-temp">{weather.temp_c}°C</div>
           <div className="weather-desc">{weather.description}</div>
