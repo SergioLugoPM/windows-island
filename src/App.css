@@ -337,19 +337,6 @@
   text-overflow: ellipsis;
 }
 
-.media-empty-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  border: 2px dashed rgba(255, 255, 255, 0.18);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 22px;
-  color: rgba(255, 255, 255, 0.25);
-}
-
 .media-controls {
   display: flex;
   align-items: center;
@@ -686,10 +673,6 @@
 }
 .theme-light .media-artist {
   color: rgba(80, 80, 100, 0.6);
-}
-.theme-light .media-empty-icon {
-  border-color: rgba(0, 0, 0, 0.18);
-  color: rgba(0, 0, 0, 0.30);
 }
 .theme-light .media-btn {
   color: rgba(40, 40, 60, 0.65);
@@ -1057,10 +1040,6 @@
 }
 .theme-glass .media-artist {
   color: rgba(255, 255, 255, 0.58);
-}
-.theme-glass .media-empty-icon {
-  border-color: rgba(255, 255, 255, 0.25);
-  color: rgba(255, 255, 255, 0.35);
 }
 .theme-glass .media-btn {
   color: rgba(255, 255, 255, 0.72);
