@@ -59,7 +59,7 @@ mod win_sys {
         pub fn GetCursorPos(lp_point: *mut POINT) -> i32;
         pub fn SystemParametersInfoW(
             ui_action: u32, ui_param: u32,
-            pv_param:  *mut RECT, f_win_ini: u32,
+            pv_param:  *mut core::ffi::c_void, f_win_ini: u32,
         ) -> i32;
         pub fn DwmSetWindowAttribute(
             hwnd: isize, dw_attribute: u32,
@@ -162,8 +162,27 @@ mod win_sys {
     /// Bottom of the work area (above taskbar) — physical pixels on DPI-aware process.
     pub fn work_area_bottom() -> i32 {
         let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
-        unsafe { SystemParametersInfoW(0x0030, 0, &mut rect, 0); }
+        unsafe { SystemParametersInfoW(0x0030, 0, &mut rect as *mut RECT as *mut core::ffi::c_void, 0); }
         rect.bottom
+    }
+
+    /// Read the current desktop wallpaper's file path (SPI_GETDESKWALLPAPER = 0x0073).
+    /// Returns None if there is no wallpaper file (solid color background) or the
+    /// call fails.
+    pub fn wallpaper_path() -> Option<String> {
+        const SPI_GETDESKWALLPAPER: u32 = 0x0073;
+        const MAX_PATH: usize = 260;
+        let mut buf: [u16; MAX_PATH] = [0; MAX_PATH];
+        let ok = unsafe {
+            SystemParametersInfoW(
+                SPI_GETDESKWALLPAPER, MAX_PATH as u32,
+                buf.as_mut_ptr() as *mut core::ffi::c_void, 0,
+            )
+        };
+        if ok == 0 { return None; }
+        let len = buf.iter().position(|&c| c == 0).unwrap_or(0);
+        if len == 0 { return None; }
+        Some(String::from_utf16_lossy(&buf[..len]))
     }
 
     /// Returns false if another instance is already running (named mutex already exists).
@@ -472,6 +491,30 @@ fn get_system_stats(state: State<'_, AppState>) -> stats::SystemStats {
     stats::collect(&state.stats)
 }
 
+#[derive(serde::Serialize)]
+struct AccentColor { r: u8, g: u8, b: u8 }
+
+#[tauri::command]
+async fn get_wallpaper_accent() -> Option<AccentColor> {
+    #[cfg(target_os = "windows")]
+    {
+        let path = win_sys::wallpaper_path()?;
+        let img = image::open(&path).ok()?;
+        let small = img.resize_exact(16, 16, image::imageops::FilterType::Nearest).to_rgb8();
+        let (mut r, mut g, mut b, mut n) = (0u64, 0u64, 0u64, 0u64);
+        for px in small.pixels() {
+            r += px[0] as u64;
+            g += px[1] as u64;
+            b += px[2] as u64;
+            n += 1;
+        }
+        if n == 0 { return None; }
+        Some(AccentColor { r: (r / n) as u8, g: (g / n) as u8, b: (b / n) as u8 })
+    }
+    #[cfg(not(target_os = "windows"))]
+    None
+}
+
 #[tauri::command]
 async fn get_weather(city: String, state: State<'_, AppState>) -> Result<weather::WeatherInfo, String> {
     {
@@ -767,6 +810,7 @@ pub fn run() {
             skip_previous,
             get_weather,
             get_system_stats,
+            get_wallpaper_accent,
             get_translation,
             set_locale,
         ])

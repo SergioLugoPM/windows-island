@@ -22,6 +22,7 @@ thiserror   = "1.0"
 urlencoding = "2"
 # System metrics (CPU, RAM, network, disk). components/users disabled to slim deps.
 sysinfo     = { version = "0.32", default-features = false, features = ["system", "network", "disk"] }
+image       = { version = "0.25", default-features = false, features = ["jpeg", "png", "bmp"] }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [

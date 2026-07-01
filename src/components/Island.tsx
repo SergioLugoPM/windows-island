@@ -190,6 +190,20 @@ export function Island() {
     }).catch(() => {});
   }, []);
 
+  // ── Sample wallpaper accent color and expose it as a CSS var ──
+  useEffect(() => {
+    if (!isTauri) return;
+    invoke<{ r: number; g: number; b: number } | null>('get_wallpaper_accent')
+      .then(accent => {
+        if (accent) {
+          document.documentElement.style.setProperty(
+            '--accent-rgb', `${accent.r}, ${accent.g}, ${accent.b}`
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // ── Snap when positionMode changes ──
   useEffect(() => {
     if (settings.positionMode !== "floating") {
