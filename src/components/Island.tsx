@@ -13,7 +13,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Mode = "idle" | "peek" | "media" | "stats" | "full" | "settings";
+type Mode = "idle" | "peek" | "media" | "stats" | "weather" | "full" | "settings";
 
 /** "top" = snapped to top edge (cursor must reach screen top to activate).
  *  "floating" = free drag, always reacts to hover. */
@@ -84,6 +84,7 @@ const DIMS: Record<Mode, { w: number; h: number; r: number }> = {
   peek:     { w: 310, h: 68,  r: 34 },
   media:    { w: 350, h: 122, r: 28 },
   stats:    { w: 300, h: 240, r: 22 },
+  weather:  { w: 320, h: 210, r: 26 },
   full:     { w: 370, h: 158, r: 30 },
   settings: { w: 310, h: 192, r: 28 },
 };
@@ -92,7 +93,7 @@ function getModeDims(mode: Mode, clockSize: ClockSize) {
   return mode === "idle" ? IDLE_DIMS[clockSize] : DIMS[mode];
 }
 
-const CYCLE: Mode[] = ["peek", "media", "stats", "full"];
+const CYCLE: Mode[] = ["peek", "media", "stats", "weather", "full"];
 const spring     = { type: "spring" as const, stiffness: 480, damping: 36, mass: 0.75 };
 const springFast = { type: "spring" as const, stiffness: 600, damping: 38, mass: 0.6 };
 
@@ -578,6 +579,19 @@ export function Island() {
                 style={{ width: "100%" }}
               >
                 <StatsFull />
+              </motion.div>
+            )}
+
+            {/* ── WEATHER ── */}
+            {mode === "weather" && (
+              <motion.div key="weather"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={springFast}
+                style={{ width: "100%" }}
+              >
+                <WeatherView />
               </motion.div>
             )}
 

@@ -5,6 +5,9 @@ export interface WeatherInfo {
   description: string;
   icon_code: string;
   city: string;
+  humidity: number;
+  feels_like_c: number;
+  wind_kmph: number;
 }
 
 const WEATHER_ICONS: Record<string, string> = {
@@ -80,12 +83,34 @@ export function WeatherView({ city = "auto", compact = false }: Props) {
   }
 
   return (
-    <div className="weather-row">
-      <div className="weather-icon">{getIcon(weather.icon_code)}</div>
-      <div className="weather-info">
-        <div className="weather-temp">{weather.temp_c}°C</div>
-        <div className="weather-desc">{weather.description}</div>
-        <div className="weather-city">{weather.city}</div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%" }}>
+      <div className="weather-row">
+        <div className="weather-icon">{getIcon(weather.icon_code)}</div>
+        <div className="weather-info">
+          <div className="weather-temp">{weather.temp_c}°C</div>
+          <div className="weather-desc">{weather.description}</div>
+          <div className="weather-city">{weather.city}</div>
+        </div>
+      </div>
+      <div className="stat-card-grid">
+        <div className="stat-card">
+          <div className="stat-card-header">Humidity</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(230,235,255,0.95)" }}>
+            {weather.humidity}%
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card-header">Feels like</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(230,235,255,0.95)" }}>
+            {weather.feels_like_c}°C
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card-header">Wind</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(230,235,255,0.95)" }}>
+            {weather.wind_kmph} km/h
+          </div>
+        </div>
       </div>
     </div>
   );

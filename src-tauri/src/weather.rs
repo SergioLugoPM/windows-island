@@ -6,6 +6,9 @@ pub struct WeatherInfo {
     pub description: String,
     pub icon_code: String,
     pub city: String,
+    pub humidity: i32,
+    pub feels_like_c: i32,
+    pub wind_kmph: i32,
 }
 
 // ─── wttr.in response shapes ──────────────────────────────────────────────────
@@ -20,6 +23,11 @@ struct WttrResponse {
 struct WttrCurrent {
     #[serde(rename = "temp_C")]
     temp_c: String,
+    #[serde(rename = "FeelsLikeC")]
+    feels_like_c: String,
+    humidity: String,
+    #[serde(rename = "windspeedKmph")]
+    windspeed_kmph: String,
     #[serde(rename = "weatherDesc")]
     weather_desc: Vec<WttrValue>,
     #[serde(rename = "weatherCode")]
@@ -75,6 +83,10 @@ pub async fn get_weather(city: &str) -> Result<WeatherInfo, String> {
 
     let temp_c: i32 = cur.temp_c.parse().map_err(|e: std::num::ParseIntError| e.to_string())?;
 
+    let humidity: i32 = cur.humidity.parse().unwrap_or(0);
+    let feels_like_c: i32 = cur.feels_like_c.parse().unwrap_or(temp_c);
+    let wind_kmph: i32 = cur.windspeed_kmph.parse().unwrap_or(0);
+
     let description = cur
         .weather_desc
         .into_iter()
@@ -87,5 +99,8 @@ pub async fn get_weather(city: &str) -> Result<WeatherInfo, String> {
         description,
         icon_code: cur.weather_code,
         city: city_name,
+        humidity,
+        feels_like_c,
+        wind_kmph,
     })
 }
