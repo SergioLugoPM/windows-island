@@ -39,6 +39,7 @@ interface Settings {
   peekContent:  PeekContent;
   theme:        Theme;
   clockSize:    ClockSize;
+  showSeconds:  boolean;
 }
 
 function defaultSettings(): Settings {
@@ -48,6 +49,7 @@ function defaultSettings(): Settings {
     peekContent:  "weather",
     theme:        "dark",
     clockSize:    "M",
+    showSeconds:  false,
   };
 }
 
@@ -74,9 +76,9 @@ function saveSettings(s: Settings) {
 
 // Idle pill varies by clock size
 const IDLE_DIMS: Record<ClockSize, { w: number; h: number; r: number }> = {
-  S: { w: 140, h: 52, r: 26 },
-  M: { w: 160, h: 64, r: 32 },
-  L: { w: 184, h: 80, r: 40 },
+  S: { w: 180, h: 52, r: 26 },
+  M: { w: 210, h: 64, r: 32 },
+  L: { w: 250, h: 80, r: 40 },
 };
 
 // All expanded modes share one constant size (Caelestia-style: the panel
@@ -502,6 +504,7 @@ export function Island() {
   const setPeekContent  = (v: PeekContent)  => setSettings(s => ({ ...s, peekContent: v }));
   const setTheme        = (v: Theme)        => setSettings(s => ({ ...s, theme: v }));
   const setClockSize    = (v: ClockSize)    => setSettings(s => ({ ...s, clockSize: v }));
+  const setShowSeconds  = (v: boolean)      => setSettings(s => ({ ...s, showSeconds: v }));
 
   const cycleIndex = CYCLE.indexOf(mode as Exclude<Mode, "idle" | "settings">);
 
@@ -564,7 +567,7 @@ export function Island() {
                 transition={springFast}
                 style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}
               >
-                <Clock variant="idle" format={settings.clockFormat} />
+                <Clock variant="idle" format={settings.clockFormat} showSeconds={settings.showSeconds} />
                 {isPlaying && (
                   <AudioVisualizer
                     bars={idleAudio.bars}
@@ -672,6 +675,17 @@ export function Island() {
                         onClick={(e) => { e.stopPropagation(); setClockFormat("24h"); }}>24h</button>
                       <button className={`settings-opt ${settings.clockFormat === "12h" ? "active" : ""}`}
                         onClick={(e) => { e.stopPropagation(); setClockFormat("12h"); }}>12h</button>
+                    </div>
+                  </div>
+
+                  {/* Segundos */}
+                  <div className="settings-row">
+                    <span className="settings-label">Segundos</span>
+                    <div className="settings-toggle">
+                      <button className={`settings-opt ${!settings.showSeconds ? "active" : ""}`}
+                        onClick={(e) => { e.stopPropagation(); setShowSeconds(false); }}>No</button>
+                      <button className={`settings-opt ${settings.showSeconds ? "active" : ""}`}
+                        onClick={(e) => { e.stopPropagation(); setShowSeconds(true); }}>Sí</button>
                     </div>
                   </div>
 

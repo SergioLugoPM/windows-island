@@ -7,6 +7,7 @@ interface ClockData {
   ampm: string;
   date: string;
   day: string;
+  seconds: string;
 }
 
 function getNow(format: ClockFormat): ClockData {
@@ -18,6 +19,8 @@ function getNow(format: ClockFormat): ClockData {
     minute: "2-digit",
     hour12: use12,
   });
+
+  const seconds = now.getSeconds().toString().padStart(2, "0");
 
   // Separate AM/PM from time string for 12h mode
   const ampm = use12
@@ -31,21 +34,23 @@ function getNow(format: ClockFormat): ClockData {
 
   const date = now.toLocaleDateString("es", { day: "numeric", month: "short" });
   const day = now.toLocaleDateString("es", { weekday: "long" });
-  return { time: cleanTime, ampm, date, day };
+  return { time: cleanTime, ampm, date, day, seconds };
 }
 
 interface Props {
   format?: ClockFormat;
   variant?: "idle" | "compact" | "expanded";
+  showSeconds?: boolean;
 }
 
-export function Clock({ format = "24h", variant = "expanded" }: Props) {
+export function Clock({ format = "24h", variant = "expanded", showSeconds = false }: Props) {
   const [data, setData] = useState<ClockData>(() => getNow(format));
 
   useEffect(() => {
-    const id = setInterval(() => setData(getNow(format)), 1000);
+    const intervalMs = showSeconds ? 250 : 1000;
+    const id = setInterval(() => setData(getNow(format)), intervalMs);
     return () => clearInterval(id);
-  }, [format]);
+  }, [format, showSeconds]);
 
   if (variant === "compact") {
     return (
@@ -60,7 +65,9 @@ export function Clock({ format = "24h", variant = "expanded" }: Props) {
     return (
       <div className="clock-idle">
         <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
-          <span className="clock-idle-time">{data.time}</span>
+          <span className="clock-idle-time">
+            {data.time}{showSeconds ? `:${data.seconds}` : ""}
+          </span>
           {data.ampm && <span className="clock-idle-ampm">{data.ampm}</span>}
         </div>
         <span className="clock-idle-date">
