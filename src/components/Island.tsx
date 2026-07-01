@@ -62,6 +62,8 @@ function loadSettings(): Settings {
       if ((parsed.positionMode as string) === "bottom") parsed.positionMode = "top";
       // Migrate removed "glass" theme to "dark"
       if ((parsed.theme as string) === "glass") parsed.theme = "dark";
+      // Migrate removed "floating" position mode to "top"
+      if ((parsed.positionMode as string) === "floating") parsed.positionMode = "top";
       return { ...defaultSettings(), ...parsed };
     }
   } catch { /* ignore */ }
@@ -120,13 +122,6 @@ async function resizeToMode(
     const { invoke } = await import("@tauri-apps/api/core");
     const d = getModeDims(mode, clockSize);
     await invoke("resize_window", { label, w: d.w + MARGIN, h: d.h + MARGIN });
-  } catch { /* browser preview */ }
-}
-
-async function startDrag() {
-  try {
-    const { getCurrentWindow } = await import("@tauri-apps/api/window");
-    await getCurrentWindow().startDragging();
   } catch { /* browser preview */ }
 }
 
@@ -465,49 +460,31 @@ export function Island() {
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
-    // In settings mode: never drag — startDrag() generates OS-level mouse events
-    // that fire spurious mouseleave → collapse, and breaks option interactions.
     if (mode === "settings") return;
     const tag = (e.target as HTMLElement).closest("button, input, select, a");
     if (tag) return;
 
-    isDragging.current = false;
     const origin = { x: e.clientX, y: e.clientY };
 
     const onMove = (mv: MouseEvent) => {
-      if (!isDragging.current && (Math.abs(mv.clientX - origin.x) > 5 || Math.abs(mv.clientY - origin.y) > 5)) {
-        isDragging.current = true;
+      if (Math.abs(mv.clientX - origin.x) > 5 || Math.abs(mv.clientY - origin.y) > 5) {
         clearTimeout(longPressTimer.current);
-        // Only now hand off to the OS-native window drag — starting it eagerly
-        // on every mousedown causes a spurious mouseleave (OS drag-tracking
-        // takes over mouse routing), which prematurely collapses the
-        // long-press-to-settings gesture before its 600ms timer completes.
-        startDrag();
       }
     };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", () => document.removeEventListener("mousemove", onMove), { once: true });
 
     longPressTimer.current = setTimeout(async () => {
-      if (!isDragging.current) {
-        cancelCollapse();
-        await resizeToMode("settings", settings.clockSize, settings.positionMode, winLabelRef.current);
-        setMode("settings");
-        scheduleCollapse(8000);
-      }
+      cancelCollapse();
+      await resizeToMode("settings", settings.clockSize, settings.positionMode, winLabelRef.current);
+      setMode("settings");
+      scheduleCollapse(8000);
     }, 600);
   }, [cancelCollapse, scheduleCollapse, settings.clockSize, mode]);
 
-  const handleMouseUp = useCallback(async () => {
+  const handleMouseUp = useCallback(() => {
     clearTimeout(longPressTimer.current);
-    if (isDragging.current) {
-      if (settings.positionMode !== "floating") {
-        const edge = await snapToEdge(settings.positionMode, mode, settings.clockSize, winLabelRef.current);
-        if (edge) setSnapEdge(edge);
-      }
-      isDragging.current = false;
-    }
-  }, [settings.positionMode, settings.clockSize, mode]);
+  }, []);
 
   // ── Keyboard ──
   useEffect(() => {
@@ -524,7 +501,6 @@ export function Island() {
 
   // ── Settings updaters ──
   const setClockFormat  = (v: ClockFormat)  => setSettings(s => ({ ...s, clockFormat: v }));
-  const setPositionMode = (v: PositionMode) => setSettings(s => ({ ...s, positionMode: v }));
   const setPeekContent  = (v: PeekContent)  => setSettings(s => ({ ...s, peekContent: v }));
   const setTheme        = (v: Theme)        => setSettings(s => ({ ...s, theme: v }));
   const setClockSize    = (v: ClockSize)    => setSettings(s => ({ ...s, clockSize: v }));
@@ -748,17 +724,6 @@ export function Island() {
                         onClick={(e) => { e.stopPropagation(); setPeekContent("media"); }}>Música</button>
                       <button className={`settings-opt ${settings.peekContent === "stats" ? "active" : ""}`}
                         onClick={(e) => { e.stopPropagation(); setPeekContent("stats"); }}>Sistema</button>
-                    </div>
-                  </div>
-
-                  {/* Posición */}
-                  <div className="settings-row">
-                    <span className="settings-label">Posición</span>
-                    <div className="settings-toggle">
-                      <button className={`settings-opt ${settings.positionMode === "top" ? "active" : ""}`}
-                        onClick={(e) => { e.stopPropagation(); setPositionMode("top"); }}>↑ Borde</button>
-                      <button className={`settings-opt ${settings.positionMode === "floating" ? "active" : ""}`}
-                        onClick={(e) => { e.stopPropagation(); setPositionMode("floating"); }}>Libre</button>
                     </div>
                   </div>
 
