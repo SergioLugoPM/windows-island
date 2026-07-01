@@ -1163,15 +1163,15 @@
   position: absolute;
   left: -20%;
   width: 140%;
-  height: 40px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
-  filter: blur(6px);
+  height: 56px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  filter: blur(5px);
 }
 .weather-bd-mist-1 { top: 25%; animation: weather-drift-slow 14s ease-in-out infinite; }
 .weather-bd-mist-2 { top: 60%; animation: weather-drift-slow 18s ease-in-out infinite reverse; }
 
 .theme-light .weather-bd-mist {
-  background: linear-gradient(90deg, transparent, rgba(60, 70, 100, 0.09), transparent);
+  background: linear-gradient(90deg, transparent, rgba(60, 70, 100, 0.16), transparent);
 }
 @keyframes weather-drift-slow {
   0%, 100% { transform: translateX(-4%); }
