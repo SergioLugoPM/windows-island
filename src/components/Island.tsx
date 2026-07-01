@@ -415,7 +415,7 @@ export function Island() {
   // ── Long press → settings ──
   const longPressTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  const handleMouseDown = useCallback(async (e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
     // In settings mode: never drag — startDrag() generates OS-level mouse events
     // that fire spurious mouseleave → collapse, and breaks option interactions.
@@ -427,9 +427,14 @@ export function Island() {
     const origin = { x: e.clientX, y: e.clientY };
 
     const onMove = (mv: MouseEvent) => {
-      if (Math.abs(mv.clientX - origin.x) > 5 || Math.abs(mv.clientY - origin.y) > 5) {
+      if (!isDragging.current && (Math.abs(mv.clientX - origin.x) > 5 || Math.abs(mv.clientY - origin.y) > 5)) {
         isDragging.current = true;
         clearTimeout(longPressTimer.current);
+        // Only now hand off to the OS-native window drag — starting it eagerly
+        // on every mousedown causes a spurious mouseleave (OS drag-tracking
+        // takes over mouse routing), which prematurely collapses the
+        // long-press-to-settings gesture before its 600ms timer completes.
+        startDrag();
       }
     };
     document.addEventListener("mousemove", onMove);
@@ -443,8 +448,6 @@ export function Island() {
         scheduleCollapse(8000);
       }
     }, 600);
-
-    await startDrag();
   }, [cancelCollapse, scheduleCollapse, settings.clockSize, mode]);
 
   const handleMouseUp = useCallback(async () => {
