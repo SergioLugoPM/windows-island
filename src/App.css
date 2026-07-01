@@ -27,7 +27,7 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: rgba(28, 28, 30, 0.94);
+  background: rgba(28, 28, 30, 0.15);
   /* NO border — any border renders as a visible line at the pill edge */
   border: none;
   /* All shadows INSET — live inside the rounded region, no external bleed */
