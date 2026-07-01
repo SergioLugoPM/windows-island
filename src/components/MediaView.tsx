@@ -119,51 +119,44 @@ export function MediaMini() {
 
 // ── Full: vinyl + visualizador + controles ────────────────────────────────
 export function MediaFull() {
-  const { t } = useI18n();
   const { info, progress, liveSeconds, togglePlay, skipNext, skipPrev } = useMediaInfo();
   const audio = useAudioVisualizer(info.is_playing, 22);
-
-  if (!info.has_session) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", gap: 14, width: "100%" }}>
-        <div className="media-empty-icon">
-          ♪
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <span className="media-title">
-            {t("noMedia")}
-          </span>
-          <span className="empty-label" style={{ fontSize: 10 }}>
-            {t("noMediaHint")}
-          </span>
-        </div>
-      </div>
-    );
-  }
+  const { t } = useI18n();
 
   const hasDuration = info.duration_s > 0;
   const widthPct = `${Math.min(100, Math.max(0, progress * 100))}%`;
 
   return (
     <div className="media-vinyl-layout">
-      <Vinyl isPlaying={info.is_playing} size={64} />
+      <Vinyl isPlaying={info.is_playing} idleSpin={!info.has_session} size={64} />
 
       <div className="media-vinyl-right">
         <div className="media-vinyl-meta">
-          <div className="media-title">{info.title || "Desconocido"}</div>
-          <div className="media-artist">{info.artist || "—"}</div>
+          {info.has_session ? (
+            <>
+              <div className="media-title">{info.title || "Desconocido"}</div>
+              <div className="media-artist">{info.artist || "—"}</div>
+            </>
+          ) : (
+            <>
+              <div className="media-title">{t("noMedia")}</div>
+              <div className="media-artist">{t("noMediaHint")}</div>
+            </>
+          )}
         </div>
 
-        <AudioVisualizer bars={audio.bars} bass={audio.bass} width={168} height={26} />
+        {info.has_session && (
+          <AudioVisualizer bars={audio.bars} bass={audio.bass} width={168} height={26} />
+        )}
 
         <div className="media-vinyl-controls">
-          <button className="media-btn" onClick={skipPrev}>⏮</button>
-          <button className="media-btn play" onClick={togglePlay} style={{ fontSize: 17 }}>
+          <button className="media-btn" onClick={skipPrev} disabled={!info.has_session}>⏮</button>
+          <button className="media-btn play" onClick={togglePlay} disabled={!info.has_session} style={{ fontSize: 17 }}>
             {info.is_playing ? "⏸" : "▶"}
           </button>
-          <button className="media-btn" onClick={skipNext}>⏭</button>
+          <button className="media-btn" onClick={skipNext} disabled={!info.has_session}>⏭</button>
 
-          {hasDuration ? (
+          {info.has_session && hasDuration && (
             <div className="media-progress" style={{ flex: 1, marginLeft: 6, marginBottom: 0, position: "relative" }}>
               <div className="media-progress-fill"
                 style={{ width: widthPct, animation: "none", transition: "width 0.25s linear" }}
@@ -176,8 +169,8 @@ export function MediaFull() {
                 {fmtTime(liveSeconds)} / {fmtTime(info.duration_s)}
               </div>
             </div>
-          ) : (
-            // No duration (livestream or app didn't report) — show animated bar
+          )}
+          {info.has_session && !hasDuration && (
             <div className="media-progress" style={{ flex: 1, marginLeft: 6, marginBottom: 0 }}>
               <div className="media-progress-fill"
                 style={{ animation: info.is_playing ? undefined : "none", width: info.is_playing ? undefined : "35%" }}

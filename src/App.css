@@ -379,6 +379,16 @@
   background: rgba(255, 255, 255, 0.10);
 }
 
+.media-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.media-btn:disabled:hover {
+  background: none;
+  color: inherit;
+}
+
 .media-btn.play {
   font-size: 16px;
   color: rgba(255, 255, 255, 0.88);

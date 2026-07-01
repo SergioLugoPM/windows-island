@@ -2,9 +2,13 @@ interface Props {
   isPlaying: boolean;
   size?: number;
   label?: string;
+  idleSpin?: boolean; // when true and !isPlaying, spin slowly instead of stopping
 }
 
-export function Vinyl({ isPlaying, size = 62, label = "♪" }: Props) {
+export function Vinyl({ isPlaying, size = 62, label = "♪", idleSpin = false }: Props) {
+  const spinning = isPlaying || idleSpin;
+  const duration = isPlaying ? "2.8s" : "14s";
+
   return (
     <div
       style={{
@@ -13,8 +17,8 @@ export function Vinyl({ isPlaying, size = 62, label = "♪" }: Props) {
         borderRadius: "50%",
         flexShrink: 0,
         position: "relative",
-        animation: isPlaying ? "vinyl-spin 2.8s linear infinite" : "none",
-        animationPlayState: isPlaying ? "running" : "paused",
+        animation: spinning ? `vinyl-spin ${duration} linear infinite` : "none",
+        animationPlayState: spinning ? "running" : "paused",
       }}
     >
       {/* Grooves */}
