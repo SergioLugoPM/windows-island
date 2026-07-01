@@ -255,12 +255,12 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 1px;
+  gap: 4px;
 }
 
 .clock-time-big {
   font-family: -apple-system, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
-  font-size: 22px;
+  font-size: 40px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.95);
   letter-spacing: -0.3px;
@@ -270,7 +270,7 @@
 
 .clock-date {
   font-family: -apple-system, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 400;
   color: rgba(255, 255, 255, 0.40);
   letter-spacing: 0.4px;

@@ -74,8 +74,8 @@ export function WeatherView({ city = "auto", compact = false }: Props) {
   if (compact) {
     return (
       <div className="weather-row">
-        <span style={{ fontSize: 28, lineHeight: 1, flexShrink: 0 }}>{getIcon(weather.icon_code)}</span>
-        <span className="weather-temp" style={{ fontSize: 15 }}>
+        <span style={{ fontSize: 48, lineHeight: 1, flexShrink: 0 }}>{getIcon(weather.icon_code)}</span>
+        <span className="weather-temp" style={{ fontSize: 28 }}>
           {weather.temp_c}°
         </span>
       </div>

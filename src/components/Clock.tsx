@@ -76,7 +76,7 @@ export function Clock({ format = "24h", variant = "expanded" }: Props) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
         <span className="clock-time-big">{data.time}</span>
         {data.ampm && (
-          <span style={{ fontSize: 11, color: "rgba(140,165,255,0.65)", fontWeight: 500 }}>
+          <span style={{ fontSize: 18, color: "rgba(140,165,255,0.65)", fontWeight: 500 }}>
             {data.ampm}
           </span>
         )}

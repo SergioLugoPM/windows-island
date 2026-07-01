@@ -568,10 +568,10 @@ export function Island() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={springFast}
-                style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", height: "100%", justifyContent: "center" }}
+                style={{ display: "flex", alignItems: "center", gap: 24, width: "100%", height: "100%", justifyContent: "center" }}
               >
                 <Clock variant="expanded" format={settings.clockFormat} />
-                <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.10)", flexShrink: 0 }} />
+                <div style={{ width: 1, height: 60, background: "rgba(255,255,255,0.10)", flexShrink: 0 }} />
                 {settings.peekContent === "weather" && <WeatherView compact />}
                 {settings.peekContent === "media"   && <MediaMini />}
                 {settings.peekContent === "stats"   && <StatsMini />}
@@ -626,9 +626,9 @@ export function Island() {
                 transition={springFast}
                 style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}
               >
-                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
                   <Clock variant="expanded" format={settings.clockFormat} />
-                  <div style={{ width: 1, height: 32, background: "rgba(255,255,255,0.10)", flexShrink: 0 }} />
+                  <div style={{ width: 1, height: 60, background: "rgba(255,255,255,0.10)", flexShrink: 0 }} />
                   <WeatherView compact />
                 </div>
                 <div style={{ height: 1, background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.09),transparent)" }} />
