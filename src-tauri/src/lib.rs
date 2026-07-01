@@ -708,14 +708,26 @@ pub fn run() {
                 let hwnd_raw: isize = unsafe { std::mem::transmute_copy(&hwnd) };
                 win_sys::set_backdrop(hwnd_raw, 1); // 1 = auto/none
 
-                // ── SPIKE: DwmEnableBlurBehindWindow go/no-go test ──────────
-                // Unlike Mica, blur-behind is clipped via an HRGN, so it can
-                // respect the pill's rounded shape. Purely additive/one-shot;
-                // remove this block entirely if the spike is rejected.
-                if let Ok(size) = win.inner_size() {
-                    let ok = win_sys::enable_blur_behind(hwnd_raw, size.width as i32, size.height as i32, 32);
-                    eprintln!("[SPIKE] blur-behind enable result: {}", ok);
-                }
+                // ── SPIKE: Mica + DWMWA_WINDOW_CORNER_PREFERENCE go/no-go test ──
+                // Mica alone (tried before this session) paints the window's full
+                // rectangle, ignoring the CSS border-radius, since this window has
+                // no native title bar (WS_CAPTION) for DWM to anchor corner
+                // rounding to. DWMWA_WINDOW_CORNER_PREFERENCE explicitly tells DWM
+                // to round the window's actual compositor-level corners,
+                // independent of window style — this is the technique Windhawk's
+                // translucent-windows mod uses. Testing whether it fixes Mica's
+                // square-corner bug on a borderless window. Purely additive/
+                // one-shot; remove this block entirely if the spike is rejected.
+                win_sys::set_backdrop(hwnd_raw, 2); // 2 = Mica
+                let corner_round: u32 = 2; // DWMWCP_ROUND
+                let corner_ok = unsafe {
+                    win_sys::DwmSetWindowAttribute(
+                        hwnd_raw, 33u32, // DWMWA_WINDOW_CORNER_PREFERENCE
+                        &corner_round as *const u32 as *const core::ffi::c_void,
+                        std::mem::size_of::<u32>() as u32,
+                    )
+                };
+                eprintln!("[SPIKE] Mica+CornerPreference set, corner call result: {}", corner_ok);
             }
 
             // ── Initial position — top center of primary monitor ──────────────
