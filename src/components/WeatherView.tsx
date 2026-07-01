@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { WeatherBackdrop } from "./WeatherBackdrop";
 
 export interface WeatherInfo {
   temp_c: number;
@@ -83,8 +84,9 @@ export function WeatherView({ city = "auto", compact = false }: Props) {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%" }}>
-      <div className="weather-row">
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", position: "relative" }}>
+      <WeatherBackdrop iconCode={weather.icon_code} />
+      <div className="weather-row" style={{ position: "relative", zIndex: 1 }}>
         <div className="weather-icon">{getIcon(weather.icon_code)}</div>
         <div className="weather-info">
           <div className="weather-temp">{weather.temp_c}°C</div>
@@ -92,7 +94,7 @@ export function WeatherView({ city = "auto", compact = false }: Props) {
           <div className="weather-city">{weather.city}</div>
         </div>
       </div>
-      <div className="stat-card-grid">
+      <div className="stat-card-grid" style={{ position: "relative", zIndex: 1 }}>
         <div className="stat-card">
           <div className="stat-card-header">Humidity</div>
           <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(230,235,255,0.95)" }}>

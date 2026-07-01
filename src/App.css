@@ -1124,3 +1124,115 @@
 .theme-glass .full-divider {
   background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.18), transparent);
 }
+
+/* ─── Weather animated backdrop ─── */
+.weather-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Clear — soft glow */
+.weather-bd-sun {
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 210, 120, 0.18) 0%, transparent 70%);
+  animation: weather-glow-pulse 6s ease-in-out infinite;
+}
+@keyframes weather-glow-pulse {
+  0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+  50%      { opacity: 1;   transform: translateX(-50%) scale(1.08); }
+}
+
+/* Clouds — drifting blurred ellipses */
+.weather-bd-cloud {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  filter: blur(18px);
+}
+.weather-bd-cloud-1 { width: 160px; height: 60px; top: 10%; animation: weather-drift 22s linear infinite; }
+.weather-bd-cloud-2 { width: 120px; height: 46px; top: 40%; animation: weather-drift 30s linear infinite reverse; opacity: 0.7; }
+.weather-bd-cloud-3 { width: 100px; height: 40px; top: 65%; animation: weather-drift 26s linear infinite; opacity: 0.5; }
+@keyframes weather-drift {
+  from { transform: translateX(-140px); }
+  to   { transform: translateX(420px); }
+}
+
+/* Mist — soft horizontal bands */
+.weather-bd-mist {
+  position: absolute;
+  left: -20%;
+  width: 140%;
+  height: 40px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  filter: blur(6px);
+}
+.weather-bd-mist-1 { top: 25%; animation: weather-drift-slow 14s ease-in-out infinite; }
+.weather-bd-mist-2 { top: 60%; animation: weather-drift-slow 18s ease-in-out infinite reverse; }
+@keyframes weather-drift-slow {
+  0%, 100% { transform: translateX(-4%); }
+  50%      { transform: translateX(4%); }
+}
+
+/* Rain — falling streaks */
+.weather-bd-rain { position: absolute; inset: 0; }
+.weather-bd-drop {
+  position: absolute;
+  top: -10%;
+  width: 1.5px;
+  height: 16px;
+  background: linear-gradient(rgba(160, 200, 255, 0), rgba(160, 200, 255, 0.45));
+  animation-name: weather-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes weather-fall {
+  from { transform: translateY(-20px); opacity: 0; }
+  10%  { opacity: 1; }
+  to   { transform: translateY(300px); opacity: 0.2; }
+}
+
+/* Storm — occasional flash */
+.weather-bd-flash {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.35);
+  opacity: 0;
+  animation: weather-flash 7s ease-in-out infinite;
+}
+@keyframes weather-flash {
+  0%, 92%, 100% { opacity: 0; }
+  93%           { opacity: 0.5; }
+  94%           { opacity: 0; }
+  95%           { opacity: 0.3; }
+  96%           { opacity: 0; }
+}
+
+/* Snow — falling flakes with sway */
+.weather-bd-snow { position: absolute; inset: 0; }
+.weather-bd-flake {
+  position: absolute;
+  top: -6%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.65);
+  animation-name: weather-snow-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes weather-snow-fall {
+  0%   { transform: translate(0, -10px); opacity: 0; }
+  10%  { opacity: 0.9; }
+  50%  { transform: translate(10px, 140px); }
+  100% { transform: translate(-6px, 300px); opacity: 0.1; }
+}
