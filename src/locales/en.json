@@ -1,6 +1,7 @@
 {
   "cpu": "CPU",
   "ram": "RAM",
+  "disk": "DISK",
   "battery": "BAT",
   "charging": "⚡ charging",
   "network": "NET",

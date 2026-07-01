@@ -15,7 +15,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use std::time::Instant;
-use sysinfo::{CpuRefreshKind, MemoryRefreshKind, Networks, RefreshKind, System};
+use sysinfo::{CpuRefreshKind, Disks, MemoryRefreshKind, Networks, RefreshKind, System};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct SystemStats {
@@ -34,11 +34,16 @@ pub struct SystemStats {
     pub battery_charging: bool,
     /// CPU package temperature in °C; None if unavailable
     pub cpu_temp_c: Option<f32>,
+    /// 0..100 — used / total space on the system drive (C:\)
+    pub disk_percent: f32,
+    pub disk_used_gb: f64,
+    pub disk_total_gb: f64,
 }
 
 pub struct StatsState {
     pub sys: Mutex<System>,
     pub networks: Mutex<Networks>,
+    pub disks: Mutex<Disks>,
     pub last_refresh: Mutex<Instant>,
 }
 
@@ -50,9 +55,11 @@ impl StatsState {
                 .with_memory(MemoryRefreshKind::everything()),
         );
         let networks = Networks::new_with_refreshed_list();
+        let disks = Disks::new_with_refreshed_list();
         Self {
             sys: Mutex::new(sys),
             networks: Mutex::new(networks),
+            disks: Mutex::new(disks),
             last_refresh: Mutex::new(Instant::now()),
         }
     }
@@ -77,6 +84,9 @@ pub fn collect(state: &StatsState) -> SystemStats {
     sys.refresh_memory();
     networks.refresh();
 
+    let mut disks = state.disks.lock().unwrap();
+    disks.refresh();
+
     let cpu_percent = sys.global_cpu_usage();
 
     let ram_total = sys.total_memory();
@@ -98,6 +108,22 @@ pub fn collect(state: &StatsState) -> SystemStats {
     let (battery_percent, battery_charging) = battery_status();
     let cpu_temp_c = read_cpu_temp_lhm();
 
+    let (disk_used_gb, disk_total_gb, disk_percent) = disks
+        .list()
+        .iter()
+        .find(|d| d.mount_point().to_string_lossy().eq_ignore_ascii_case("c:\\"))
+        .or_else(|| disks.list().first())
+        .map(|d| {
+            let total = d.total_space();
+            let avail = d.available_space();
+            let used = total.saturating_sub(avail);
+            let total_gb = total as f64 / 1_073_741_824.0;
+            let used_gb = used as f64 / 1_073_741_824.0;
+            let pct = if total > 0 { (used as f32 / total as f32) * 100.0 } else { 0.0 };
+            (used_gb, total_gb, pct)
+        })
+        .unwrap_or((0.0, 0.0, 0.0));
+
     SystemStats {
         cpu_percent,
         ram_percent,
@@ -108,6 +134,9 @@ pub fn collect(state: &StatsState) -> SystemStats {
         battery_percent,
         battery_charging,
         cpu_temp_c,
+        disk_percent,
+        disk_used_gb,
+        disk_total_gb,
     }
 }
 

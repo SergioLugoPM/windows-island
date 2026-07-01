@@ -11,6 +11,9 @@ export interface SystemStats {
   battery_percent:   number;
   battery_charging:  boolean;
   cpu_temp_c:        number | null;
+  disk_percent:      number;
+  disk_used_gb:      number;
+  disk_total_gb:     number;
 }
 
 /** Poll system stats every 1.5s. Single source of truth for both Full and Compact views. */
@@ -19,6 +22,7 @@ export function useSystemStats() {
     cpu_percent: 0, ram_percent: 0, ram_used_mb: 0, ram_total_mb: 0,
     net_down_kbps: 0, net_up_kbps: 0,
     battery_percent: -1, battery_charging: false, cpu_temp_c: null,
+    disk_percent: 0, disk_used_gb: 0, disk_total_gb: 0,
   });
 
   useEffect(() => {
@@ -89,6 +93,12 @@ export function StatsFull() {
         sub={`${(s.ram_used_mb / 1024).toFixed(1)} / ${(s.ram_total_mb / 1024).toFixed(1)} GB`}
         bar={s.ram_percent / 100}
         color={colorForLoad(s.ram_percent)}
+      />
+      <StatRow label={t("disk")}
+        value={`${s.disk_percent.toFixed(0)}%`}
+        sub={`${s.disk_used_gb.toFixed(0)} / ${s.disk_total_gb.toFixed(0)} GB`}
+        bar={s.disk_percent / 100}
+        color={colorForLoad(s.disk_percent)}
       />
       {hasBattery && (
         <StatRow label={t("battery")}
