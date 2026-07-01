@@ -115,7 +115,7 @@ export function StatsFull() {
       <div className="stat-card">
         <div className="stat-card-header">{t("cpu")}</div>
         <StatBar value={s.cpu_percent / 100} color={colorForLoad(s.cpu_percent)} />
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(200,210,235,0.6)" }}>
+        <div className="stat-card-footer" style={{ display: "flex", justifyContent: "space-between", fontSize: 9 }}>
           <span>{s.cpu_percent.toFixed(0)}%</span>
           {s.cpu_temp_c !== null && <span>{s.cpu_temp_c.toFixed(0)}°C</span>}
         </div>
@@ -147,7 +147,7 @@ export function StatsFull() {
             s.battery_percent < 50 ? "rgba(255,200,90,0.85)" :
             "rgba(120,220,140,0.85)"
           } />
-          <div style={{ fontSize: 9, color: "rgba(200,210,235,0.6)" }}>
+          <div className="stat-card-footer" style={{ fontSize: 9 }}>
             {s.battery_percent}%{s.battery_charging ? ` · ${t("charging")}` : ""}
           </div>
         </div>

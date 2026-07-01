@@ -14,30 +14,21 @@ export function RingStat({ percent, color, size = 56, label, sub }: RingStatProp
   const offset = circumference * (1 - clamped / 100);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: size }}>
+    <div className="ring-stat" style={{ minWidth: size }}>
       <div style={{ position: "relative", width: size, height: size }}>
         <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none"
-            stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} />
+          <circle className="ring-stat-track" cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} />
           <circle cx={size / 2} cy={size / 2} r={r} fill="none"
             stroke={color} strokeWidth={stroke} strokeLinecap="round"
             strokeDasharray={circumference} strokeDashoffset={offset}
             style={{ transition: "stroke-dashoffset 0.4s ease" }} />
         </svg>
-        <div style={{
-          position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: size * 0.24, fontWeight: 700, color: "rgba(230,235,255,0.95)",
-          fontVariantNumeric: "tabular-nums",
-        }}>
+        <div className="ring-stat-value" style={{ fontSize: size * 0.24 }}>
           {clamped.toFixed(0)}%
         </div>
       </div>
-      <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: 0.4, color: "rgba(140,170,220,0.7)", textTransform: "uppercase" }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 9, color: "rgba(200,210,235,0.55)", fontVariantNumeric: "tabular-nums" }}>
-        {sub}
-      </div>
+      <div className="ring-stat-label">{label}</div>
+      <div className="ring-stat-sub">{sub}</div>
     </div>
   );
 }

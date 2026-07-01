@@ -97,19 +97,19 @@ export function WeatherView({ city = "auto", compact = false }: Props) {
       <div className="stat-card-grid" style={{ position: "relative", zIndex: 1 }}>
         <div className="stat-card">
           <div className="stat-card-header">Humidity</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(230,235,255,0.95)" }}>
+          <div className="weather-stat-value" style={{ fontSize: 14, fontWeight: 700 }}>
             {weather.humidity}%
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-card-header">Feels like</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(230,235,255,0.95)" }}>
+          <div className="weather-stat-value" style={{ fontSize: 14, fontWeight: 700 }}>
             {weather.feels_like_c}°C
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-card-header">Wind</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(230,235,255,0.95)" }}>
+          <div className="weather-stat-value" style={{ fontSize: 14, fontWeight: 700 }}>
             {weather.wind_kmph} km/h
           </div>
         </div>
