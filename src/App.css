@@ -1136,6 +1136,10 @@
   50%      { opacity: 1;   transform: translateX(-50%) scale(1.08); }
 }
 
+.theme-light .weather-bd-sun {
+  background: radial-gradient(circle, rgba(255, 170, 60, 0.22) 0%, transparent 70%);
+}
+
 /* Clouds — drifting blurred ellipses */
 .weather-bd-cloud {
   position: absolute;
@@ -1146,6 +1150,10 @@
 .weather-bd-cloud-1 { width: 160px; height: 60px; top: 10%; animation: weather-drift 22s linear infinite; }
 .weather-bd-cloud-2 { width: 120px; height: 46px; top: 40%; animation: weather-drift 30s linear infinite reverse; opacity: 0.7; }
 .weather-bd-cloud-3 { width: 100px; height: 40px; top: 65%; animation: weather-drift 26s linear infinite; opacity: 0.5; }
+
+.theme-light .weather-bd-cloud {
+  background: rgba(60, 70, 100, 0.10);
+}
 @keyframes weather-drift {
   from { transform: translateX(-140px); }
   to   { transform: translateX(420px); }
@@ -1162,6 +1170,10 @@
 }
 .weather-bd-mist-1 { top: 25%; animation: weather-drift-slow 14s ease-in-out infinite; }
 .weather-bd-mist-2 { top: 60%; animation: weather-drift-slow 18s ease-in-out infinite reverse; }
+
+.theme-light .weather-bd-mist {
+  background: linear-gradient(90deg, transparent, rgba(60, 70, 100, 0.09), transparent);
+}
 @keyframes weather-drift-slow {
   0%, 100% { transform: translateX(-4%); }
   50%      { transform: translateX(4%); }
@@ -1179,6 +1191,10 @@
   animation-timing-function: linear;
   animation-iteration-count: infinite;
 }
+
+.theme-light .weather-bd-drop {
+  background: linear-gradient(rgba(60, 110, 200, 0), rgba(60, 110, 200, 0.55));
+}
 @keyframes weather-fall {
   from { transform: translateY(-20px); opacity: 0; }
   10%  { opacity: 1; }
@@ -1192,6 +1208,10 @@
   background: rgba(255, 255, 255, 0.35);
   opacity: 0;
   animation: weather-flash 7s ease-in-out infinite;
+}
+
+.theme-light .weather-bd-flash {
+  background: rgba(255, 255, 255, 0.6);
 }
 @keyframes weather-flash {
   0%, 92%, 100% { opacity: 0; }
@@ -1213,6 +1233,10 @@
   animation-name: weather-snow-fall;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+}
+
+.theme-light .weather-bd-flake {
+  background: rgba(90, 110, 160, 0.55);
 }
 @keyframes weather-snow-fall {
   0%   { transform: translate(0, -10px); opacity: 0; }
