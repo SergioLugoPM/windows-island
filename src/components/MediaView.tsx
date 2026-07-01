@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Vinyl } from "./Vinyl";
 import { AudioVisualizer } from "./AudioVisualizer";
 import { useAudioVisualizer } from "../hooks/useAudioVisualizer";
+import { useI18n } from "../hooks/useI18n";
 
 export interface MediaInfo {
   title: string;
@@ -118,13 +119,29 @@ export function MediaMini() {
 
 // ── Full: vinyl + visualizador + controles ────────────────────────────────
 export function MediaFull() {
+  const { t } = useI18n();
   const { info, progress, liveSeconds, togglePlay, skipNext, skipPrev } = useMediaInfo();
   const audio = useAudioVisualizer(info.is_playing, 22);
 
   if (!info.has_session) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
-        <span className="empty-label">Sin reproducción activa</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, width: "100%" }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: "50%", flexShrink: 0,
+          border: "2px dashed rgba(255,255,255,0.18)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 22, color: "rgba(255,255,255,0.25)",
+        }}>
+          ♪
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <span className="media-title" style={{ color: "rgba(255,255,255,0.75)" }}>
+            {t("noMedia")}
+          </span>
+          <span className="empty-label" style={{ fontSize: 10 }}>
+            {t("noMediaHint")}
+          </span>
+        </div>
       </div>
     );
   }

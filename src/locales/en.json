@@ -9,5 +9,7 @@
   "settings": "Settings",
   "hide": "Hide",
   "show": "Show",
-  "quit": "Quit"
+  "quit": "Quit",
+  "noMedia": "No media",
+  "noMediaHint": "Play something for it to show up here"
 }
