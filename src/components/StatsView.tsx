@@ -156,7 +156,7 @@ export function StatsFull() {
   );
 }
 
-// ─── Mini view — used inside `peek` mode next to the clock ───────────────
+// ─── Mini view — compact variant, currently unused ───────────────────────
 
 export function StatsMini() {
   const s = useSystemStats();

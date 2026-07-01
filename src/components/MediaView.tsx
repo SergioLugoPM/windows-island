@@ -90,7 +90,7 @@ interface Props {
   variant?: "full" | "compact" | "mini";
 }
 
-// ── Mini: solo controles + título (para peek) ──────────────────────────────
+// ── Mini: solo controles + título (variante compacta, actualmente sin uso) ──
 export function MediaMini() {
   const { info, togglePlay, skipNext, skipPrev } = useMediaInfo();
 
@@ -189,19 +189,24 @@ export function MediaFull() {
 export function MediaCompact() {
   const { info, togglePlay } = useMediaInfo();
   const audio = useAudioVisualizer(info.is_playing, 16);
-
-  if (!info.has_session) {
-    return <span className="empty-label">Sin reproducción activa</span>;
-  }
+  const { t } = useI18n();
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
-      <Vinyl isPlaying={info.is_playing} size={56} />
+      <Vinyl isPlaying={info.is_playing} idleSpin={!info.has_session} size={56} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="media-title" style={{ fontSize: 11 }}>{info.title || "Desconocido"}</div>
-        <AudioVisualizer bars={audio.bars} bass={audio.bass} width={110} height={14} />
+        <div className="media-title" style={{ fontSize: 11 }}>
+          {info.has_session ? (info.title || "Desconocido") : t("noMedia")}
+        </div>
+        {info.has_session ? (
+          <AudioVisualizer bars={audio.bars} bass={audio.bass} width={110} height={14} />
+        ) : (
+          <span className="empty-label" style={{ fontSize: 9 }}>{t("noMediaHint")}</span>
+        )}
       </div>
-      <button className="media-btn play" onClick={togglePlay}>{info.is_playing ? "⏸" : "▶"}</button>
+      <button className="media-btn play" onClick={togglePlay} disabled={!info.has_session}>
+        {info.is_playing ? "⏸" : "▶"}
+      </button>
     </div>
   );
 }
