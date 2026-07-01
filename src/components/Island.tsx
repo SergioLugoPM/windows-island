@@ -286,21 +286,37 @@ export function Island() {
     let monY      = 0;
     // Zone in PHYSICAL pixels: use window's actual outerPosition() so there is
     // no DPI-coordinate mismatch between the JS monitor API and GetCursorPos.
+    // IMPORTANT: winLeft/winRight start equal (zero-width) so that until the
+    // real position is fetched, `cx >= winLeft && cx < winRight` can NEVER be
+    // true — a failed fetch must fail SAFE (pill briefly unresponsive to
+    // edge-hover) rather than fail WIDE (previously fell back to winRight in
+    // the thousands of pixels, making almost the entire monitor width a false
+    // "hot zone" — this was the root cause of a reported bug where the whole
+    // top edge of the screen triggered the island instead of just its own
+    // width).
     let winLeft  = 0;
-    let winRight = 1920; // fallback — overwritten once infoReady
+    let winRight = 0;
 
-    import("@tauri-apps/api/window").then(m => {
-      const win = m.getCurrentWindow();
-      return Promise.all([win.outerPosition(), m.currentMonitor()]);
-    }).then(([pos, mon]) => {
-      if (mon) {
-        scale = mon.scaleFactor;
-        monY  = mon.position.y;
-      }
-      winLeft  = pos.x;
-      winRight = pos.x + Math.round((IDLE_DIMS[settings.clockSize].w + MARGIN) * scale);
-      infoReady = true;
-    }).catch(() => { infoReady = true; });
+    const fetchWindowInfo = () => {
+      import("@tauri-apps/api/window").then(m => {
+        const win = m.getCurrentWindow();
+        return Promise.all([win.outerPosition(), m.currentMonitor()]);
+      }).then(([pos, mon]) => {
+        if (cancelled) return;
+        if (mon) {
+          scale = mon.scaleFactor;
+          monY  = mon.position.y;
+        }
+        winLeft  = pos.x;
+        winRight = pos.x + Math.round((IDLE_DIMS[settings.clockSize].w + MARGIN) * scale);
+        infoReady = true;
+      }).catch(() => {
+        // Retry shortly instead of leaving winLeft/winRight at an unbounded
+        // fallback — see the comment above on why a wide fallback is unsafe.
+        if (!cancelled) setTimeout(fetchWindowInfo, 300);
+      });
+    };
+    fetchWindowInfo();
 
     const setPass = async (on: boolean) => {
       if (on === passthrough) return;
