@@ -436,6 +436,30 @@ export function Island() {
     // Collapse triggered by handleMouseLeave only — never while cursor is over island.
   }, [cancelCollapse, pulseControls, settings.clockSize, settings.positionMode]);
 
+  // ── Wheel: navigate modes forward/backward ──
+  const wheelLockRef = useRef(false);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    // Only navigate the CYCLE while already viewing one of its modes — not
+    // from idle (nothing to scroll through yet) and not from settings
+    // (settings intentionally isn't part of the cycle, same as handleClick's
+    // treatment of it).
+    if (mode === "idle" || mode === "settings") return;
+    if (wheelLockRef.current) return;
+
+    const idx = CYCLE.indexOf(mode as Exclude<Mode, "idle" | "settings">);
+    const direction = e.deltaY > 0 ? 1 : -1;
+    const nextIdx = (idx + direction + CYCLE.length) % CYCLE.length;
+    const nextMode = CYCLE[nextIdx];
+
+    cancelCollapse();
+    wheelLockRef.current = true;
+    setTimeout(() => { wheelLockRef.current = false; }, 350);
+
+    resizeToMode(nextMode, settings.clockSize, settings.positionMode, winLabelRef.current);
+    setMode(nextMode);
+  }, [mode, cancelCollapse, settings.clockSize, settings.positionMode]);
+
   // ── Long press → settings ──
   const longPressTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -531,6 +555,7 @@ export function Island() {
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
         onClick={handleClick}
+        onWheel={handleWheel}
         style={motionStyle}
       >
         {/* Boom rings — visible in any mode whenever media is playing.
