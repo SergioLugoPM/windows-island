@@ -82,7 +82,7 @@ const IDLE_DIMS: Record<ClockSize, { w: number; h: number; r: number }> = {
 // doesn't resize per-tab, only its content changes) — sized generously
 // enough to fit the densest view (Performance panel with CPU/Network cards
 // plus RAM/Disk rings and an optional Battery card) without clipping.
-const EXPANDED_DIMS = { w: 340, h: 260, r: 24 };
+const EXPANDED_DIMS = { w: 380, h: 280, r: 26 };
 
 const DIMS: Record<Mode, { w: number; h: number; r: number }> = {
   idle:     { w: 160, h: 64,  r: 32 },
