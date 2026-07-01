@@ -78,15 +78,20 @@ const IDLE_DIMS: Record<ClockSize, { w: number; h: number; r: number }> = {
   L: { w: 184, h: 80, r: 40 },
 };
 
-// Other modes are fixed
+// All expanded modes share one constant size (Caelestia-style: the panel
+// doesn't resize per-tab, only its content changes) — sized generously
+// enough to fit the densest view (Performance panel with CPU/Network cards
+// plus RAM/Disk rings and an optional Battery card) without clipping.
+const EXPANDED_DIMS = { w: 340, h: 260, r: 24 };
+
 const DIMS: Record<Mode, { w: number; h: number; r: number }> = {
   idle:     { w: 160, h: 64,  r: 32 },
-  peek:     { w: 310, h: 68,  r: 34 },
-  media:    { w: 350, h: 122, r: 28 },
-  stats:    { w: 300, h: 240, r: 22 },
-  weather:  { w: 320, h: 210, r: 26 },
-  full:     { w: 370, h: 158, r: 30 },
-  settings: { w: 310, h: 192, r: 28 },
+  peek:     EXPANDED_DIMS,
+  media:    EXPANDED_DIMS,
+  stats:    EXPANDED_DIMS,
+  weather:  EXPANDED_DIMS,
+  full:     EXPANDED_DIMS,
+  settings: EXPANDED_DIMS,
 };
 
 function getModeDims(mode: Mode, clockSize: ClockSize) {
@@ -563,7 +568,7 @@ export function Island() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={springFast}
-                style={{ display: "flex", alignItems: "center", gap: 14, width: "100%" }}
+                style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", height: "100%", justifyContent: "center" }}
               >
                 <Clock variant="expanded" format={settings.clockFormat} />
                 <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.10)", flexShrink: 0 }} />
@@ -638,7 +643,7 @@ export function Island() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={springFast}
-                style={{ width: "100%" }}
+                style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}
               >
                 <div className="settings-panel">
                   <div className="settings-title">⚙ Configuración</div>
