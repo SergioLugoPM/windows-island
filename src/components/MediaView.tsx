@@ -128,7 +128,7 @@ export function MediaFull() {
 
   return (
     <div className="media-vinyl-layout">
-      <div style={{ marginLeft: -90, flexShrink: 0 }}>
+      <div style={{ marginLeft: -24, flexShrink: 0 }}>
         <Vinyl isPlaying={info.is_playing} idleSpin={!info.has_session} size={200} />
       </div>
 
@@ -196,7 +196,7 @@ export function MediaCompact() {
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
-      <Vinyl isPlaying={info.is_playing} size={36} />
+      <Vinyl isPlaying={info.is_playing} size={56} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="media-title" style={{ fontSize: 11 }}>{info.title || "Desconocido"}</div>
         <AudioVisualizer bars={audio.bars} bass={audio.bass} width={110} height={14} />
