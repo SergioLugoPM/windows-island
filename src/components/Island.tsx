@@ -83,7 +83,7 @@ const DIMS: Record<Mode, { w: number; h: number; r: number }> = {
   idle:     { w: 160, h: 64,  r: 32 },
   peek:     { w: 310, h: 68,  r: 34 },
   media:    { w: 350, h: 122, r: 28 },
-  stats:    { w: 280, h: 110, r: 24 },
+  stats:    { w: 300, h: 240, r: 22 },
   full:     { w: 370, h: 158, r: 30 },
   settings: { w: 310, h: 192, r: 28 },
 };

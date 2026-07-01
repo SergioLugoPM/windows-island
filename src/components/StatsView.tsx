@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useI18n } from "../hooks/useI18n";
+import { RingStat } from "./RingStat";
 
 export interface SystemStats {
   cpu_percent:       number;
@@ -42,6 +43,34 @@ export function useSystemStats() {
   return stats;
 }
 
+/** Keeps a rolling window of recent net_down_kbps samples for the sparkline. */
+function useNetHistory(current: number, size = 20) {
+  const [history, setHistory] = useState<number[]>(() => new Array(size).fill(0));
+  useEffect(() => {
+    setHistory(h => [...h.slice(1), current]);
+  }, [current]);
+  return history;
+}
+
+function Sparkline({ values, color, width = 70, height = 24 }: {
+  values: number[]; color: string; width?: number; height?: number;
+}) {
+  const max = Math.max(1, ...values);
+  const points = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * width;
+      const y = height - (v / max) * height;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return (
+    <svg width={width} height={height} style={{ overflow: "visible" }}>
+      <polyline points={points} fill="none" stroke={color} strokeWidth={1.5}
+        strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // ─── Visual sub-components ───────────────────────────────────────────────
 
 /** Horizontal capsule bar — 0..1 fill */
@@ -79,77 +108,50 @@ export function StatsFull() {
   const s = useSystemStats();
   const { t } = useI18n();
   const hasBattery = s.battery_percent >= 0;
+  const netHistory = useNetHistory(s.net_down_kbps);
 
   return (
-    <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 7 }}>
-      <StatRow label={t("cpu")}
-        value={`${s.cpu_percent.toFixed(0)}%`}
-        sub={s.cpu_temp_c !== null ? `${s.cpu_temp_c.toFixed(0)}°C` : undefined}
-        bar={s.cpu_percent / 100}
-        color={colorForLoad(s.cpu_percent)}
-      />
-      <StatRow label={t("ram")}
-        value={`${s.ram_percent.toFixed(0)}%`}
-        sub={`${(s.ram_used_mb / 1024).toFixed(1)} / ${(s.ram_total_mb / 1024).toFixed(1)} GB`}
-        bar={s.ram_percent / 100}
-        color={colorForLoad(s.ram_percent)}
-      />
-      <StatRow label={t("disk")}
-        value={`${s.disk_percent.toFixed(0)}%`}
-        sub={`${s.disk_used_gb.toFixed(0)} / ${s.disk_total_gb.toFixed(0)} GB`}
-        bar={s.disk_percent / 100}
-        color={colorForLoad(s.disk_percent)}
-      />
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="stat-card">
+        <div className="stat-card-header">{t("cpu")}</div>
+        <StatBar value={s.cpu_percent / 100} color={colorForLoad(s.cpu_percent)} />
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "rgba(200,210,235,0.6)" }}>
+          <span>{s.cpu_percent.toFixed(0)}%</span>
+          {s.cpu_temp_c !== null && <span>{s.cpu_temp_c.toFixed(0)}°C</span>}
+        </div>
+      </div>
+
+      <div className="stat-card">
+        <div className="stat-card-header">{t("network")}</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <Sparkline values={netHistory} color="rgba(120,200,140,0.85)" />
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 9, fontVariantNumeric: "tabular-nums", color: "rgba(220,230,255,0.9)" }}>
+            <span>↓ {formatKbps(s.net_down_kbps)}</span>
+            <span>↑ {formatKbps(s.net_up_kbps)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="stat-card-rings">
+        <RingStat percent={s.ram_percent} color="rgba(170,130,255,0.85)"
+          label={t("ram")} sub={`${(s.ram_used_mb / 1024).toFixed(1)}/${(s.ram_total_mb / 1024).toFixed(1)} GB`} />
+        <RingStat percent={s.disk_percent} color="rgba(100,200,220,0.85)"
+          label={t("disk")} sub={`${s.disk_used_gb.toFixed(0)}/${s.disk_total_gb.toFixed(0)} GB`} />
+      </div>
+
       {hasBattery && (
-        <StatRow label={t("battery")}
-          value={`${s.battery_percent}%`}
-          sub={s.battery_charging ? t("charging") : undefined}
-          bar={s.battery_percent / 100}
-          color={
+        <div className="stat-card">
+          <div className="stat-card-header">{t("battery")}</div>
+          <StatBar value={s.battery_percent / 100} color={
             s.battery_percent < 20 ? "rgba(255,110,110,0.95)" :
             s.battery_percent < 50 ? "rgba(255,200,90,0.85)" :
             "rgba(120,220,140,0.85)"
-          }
-        />
+          } />
+          <div style={{ fontSize: 9, color: "rgba(200,210,235,0.6)" }}>
+            {s.battery_percent}%{s.battery_charging ? ` · ${t("charging")}` : ""}
+          </div>
+        </div>
       )}
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "baseline",
-        fontFamily: "-apple-system,'SF Pro Text','Segoe UI',system-ui,sans-serif",
-      }}>
-        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: 0.5, color: "rgba(140,170,220,0.7)" }}>
-          {t("network")}
-        </span>
-        <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(220,230,255,0.95)", fontVariantNumeric: "tabular-nums" }}>
-          ↓ {formatKbps(s.net_down_kbps)}
-          <span style={{ marginLeft: 8 }}>↑ {formatKbps(s.net_up_kbps)}</span>
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function StatRow({ label, value, sub, bar, color }: {
-  label: string; value: string; sub?: string; bar: number; color: string;
-}) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "baseline",
-        fontFamily: "-apple-system,'SF Pro Text','Segoe UI',system-ui,sans-serif",
-      }}>
-        <span style={{
-          fontSize: 10, fontWeight: 600, letterSpacing: 0.5,
-          color: "rgba(140,170,220,0.7)",
-        }}>{label}</span>
-        <span style={{
-          fontSize: 11, fontWeight: 600, color: "rgba(220,230,255,0.95)",
-          fontVariantNumeric: "tabular-nums",
-        }}>
-          {value}
-          {sub && <span style={{ fontSize: 9, fontWeight: 400, color: "rgba(140,170,220,0.6)", marginLeft: 6 }}>{sub}</span>}
-        </span>
-      </div>
-      <StatBar value={bar} color={color} />
     </div>
   );
 }
