@@ -112,22 +112,24 @@ export function StatsFull() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div className="stat-card">
-        <div className="stat-card-header">{t("cpu")}</div>
-        <StatBar value={s.cpu_percent / 100} color={colorForLoad(s.cpu_percent)} />
-        <div className="stat-card-footer" style={{ display: "flex", justifyContent: "space-between", fontSize: 9 }}>
-          <span>{s.cpu_percent.toFixed(0)}%</span>
-          {s.cpu_temp_c !== null && <span>{s.cpu_temp_c.toFixed(0)}°C</span>}
+      <div className="stat-card-row">
+        <div className="stat-card">
+          <div className="stat-card-header">{t("cpu")}</div>
+          <StatBar value={s.cpu_percent / 100} color={colorForLoad(s.cpu_percent)} />
+          <div className="stat-card-footer" style={{ display: "flex", justifyContent: "space-between", fontSize: 9 }}>
+            <span>{s.cpu_percent.toFixed(0)}%</span>
+            {s.cpu_temp_c !== null && <span>{s.cpu_temp_c.toFixed(0)}°C</span>}
+          </div>
         </div>
-      </div>
 
-      <div className="stat-card">
-        <div className="stat-card-header">{t("network")}</div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <Sparkline values={netHistory} color="rgba(120,200,140,0.85)" />
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 9, fontVariantNumeric: "tabular-nums", color: "rgba(220,230,255,0.9)" }}>
-            <span>↓ {formatKbps(s.net_down_kbps)}</span>
-            <span>↑ {formatKbps(s.net_up_kbps)}</span>
+        <div className="stat-card">
+          <div className="stat-card-header">{t("network")}</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+            <Sparkline values={netHistory} color="rgba(120,200,140,0.85)" width={54} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 8, fontVariantNumeric: "tabular-nums", color: "rgba(220,230,255,0.9)" }}>
+              <span>↓{formatKbps(s.net_down_kbps)}</span>
+              <span>↑{formatKbps(s.net_up_kbps)}</span>
+            </div>
           </div>
         </div>
       </div>

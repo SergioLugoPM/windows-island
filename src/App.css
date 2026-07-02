@@ -83,6 +83,13 @@
   width: 100%;
 }
 
+.stat-card-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+
 .ring-stat {
   display: flex;
   flex-direction: column;
