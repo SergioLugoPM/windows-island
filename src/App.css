@@ -20,6 +20,20 @@
      SVG filter artifacts to the animated border-radius. */
   overflow: hidden;
   isolation: isolate;
+  /* Soft outer halo — the app's namesake ("Nimbo" = the luminous ring
+     depicted around figures in religious art). Two layers: a tight,
+     slightly stronger glow close to the edge, and a wider, softer bloom
+     further out. Uses --accent-rgb so the glow automatically matches
+     whatever color was sampled from the user's desktop wallpaper. This
+     is a box-shadow (not filter:drop-shadow), and box-shadow on an
+     element is NOT clipped by that same element's own overflow:hidden —
+     only child content is clipped by overflow, so this renders correctly
+     bleeding outward onto the desktop despite .island-outer's own
+     overflow:hidden above. */
+  box-shadow:
+    0 0 24px 2px rgba(var(--accent-rgb), 0.22),
+    0 0 48px 8px rgba(var(--accent-rgb), 0.12);
+  transition: box-shadow 0.4s ease;
 }
 
 /* ─── Fluent Design dark base — neutral dark, no blue tints ─── */
