@@ -189,7 +189,7 @@ mod win_sys {
     /// Returns false if another instance is already running (named mutex already exists).
     /// Call once at startup; intentionally leaks the handle so it lives for the process.
     pub fn claim_single_instance() -> bool {
-        let name: Vec<u16> = "Local\\HaloW_SingleInstance_v1"
+        let name: Vec<u16> = "Local\\Nimbo_SingleInstance_v1"
             .encode_utf16()
             .chain(std::iter::once(0))
             .collect();
@@ -242,7 +242,7 @@ async fn enable_theme_injection(
         .inject_into_explorer()
         .map_err(|e| match e {
             injector::InjectorError::OpenProcessFailed(_) =>
-                "Administrator required — right-click Windows Island and select 'Run as administrator'".to_string(),
+                "Administrator required — right-click Nimbo and select 'Run as administrator'".to_string(),
             injector::InjectorError::DllNotFound =>
                 "Injector DLL not found. Try rebuilding the app.".to_string(),
             other => format!("Injection failed: {:?}", other),
@@ -740,7 +740,7 @@ pub fn run() {
                             win_sys::set_backdrop(hwnd_raw, 1);
                         }
                     }
-                    Err(e) => eprintln!("[HaloW] Could not create window {}: {}", label, e),
+                    Err(e) => eprintln!("[Nimbo] Could not create window {}: {}", label, e),
                 }
             }
 
@@ -755,7 +755,7 @@ pub fn run() {
 
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("Windows Island")
+                .tooltip("Nimbo")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 // ── Menu item selected ────────────────────────────────────────

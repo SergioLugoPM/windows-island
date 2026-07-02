@@ -1,4 +1,4 @@
-//! Theme Manager for Windows Island
+//! Theme Manager for Nimbo
 //!
 //! Provides shared memory IPC between Tauri and injected DLL for theme data.
 //! Uses Windows file mapping to share theme configuration in binary format.

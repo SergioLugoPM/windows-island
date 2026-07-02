@@ -10,7 +10,7 @@ impl I18n {
     pub fn new(locale: &str) -> Self {
         let en = json!({
             "app": {
-                "name": "Windows Island",
+                "name": "Nimbo",
                 "loading": "Loading...",
                 "error": "Error"
             },
@@ -53,7 +53,7 @@ impl I18n {
 
         let es = json!({
             "app": {
-                "name": "Windows Island",
+                "name": "Nimbo",
                 "loading": "Cargando...",
                 "error": "Error"
             },
