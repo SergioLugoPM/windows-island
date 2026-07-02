@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["get_weather"],"struct":["WeatherInfo"]};

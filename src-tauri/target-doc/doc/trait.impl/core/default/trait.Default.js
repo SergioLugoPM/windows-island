@@ -1,9 +1,0 @@
-(function() {
-    const implementors = Object.fromEntries([["windows_island_lib",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.94.1/core/default/trait.Default.html\" title=\"trait core::default::Default\">Default</a> for <a class=\"struct\" href=\"windows_island_lib/i18n/struct.I18n.html\" title=\"struct windows_island_lib::i18n::I18n\">I18n</a>",0],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.94.1/core/default/trait.Default.html\" title=\"trait core::default::Default\">Default</a> for <a class=\"struct\" href=\"windows_island_lib/media/struct.MediaInfo.html\" title=\"struct windows_island_lib::media::MediaInfo\">MediaInfo</a>",0],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.94.1/core/default/trait.Default.html\" title=\"trait core::default::Default\">Default</a> for <a class=\"struct\" href=\"windows_island_lib/stats/struct.StatsState.html\" title=\"struct windows_island_lib::stats::StatsState\">StatsState</a>",0],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.94.1/core/default/trait.Default.html\" title=\"trait core::default::Default\">Default</a> for <a class=\"struct\" href=\"windows_island_lib/stats/struct.SystemStats.html\" title=\"struct windows_island_lib::stats::SystemStats\">SystemStats</a>",0],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.94.1/core/default/trait.Default.html\" title=\"trait core::default::Default\">Default</a> for <a class=\"struct\" href=\"windows_island_lib/struct.AppState.html\" title=\"struct windows_island_lib::AppState\">AppState</a>",0]]]]);
-    if (window.register_implementors) {
-        window.register_implementors(implementors);
-    } else {
-        window.pending_implementors = implementors;
-    }
-})()
-//{"start":59,"fragment_lengths":[1515]}

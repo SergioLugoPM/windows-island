@@ -27,6 +27,7 @@ Thumbs.db
 
 # Tauri build outputs
 src-tauri/target/
+src-tauri/target-doc/
 src-tauri/gen/schemas
 
 # Injector DLL build outputs

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ThemeError"],"struct":["InjectedTheme","ThemeManager"]};

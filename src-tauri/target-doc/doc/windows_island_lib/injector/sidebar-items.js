@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["InjectorError"],"mod":["theme"],"struct":["Injector"]};

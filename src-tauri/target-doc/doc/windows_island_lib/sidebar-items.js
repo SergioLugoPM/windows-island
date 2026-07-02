@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["run"],"mod":["cpu_temp","i18n","injector","media","stats","weather"],"struct":["AppState"]};
