@@ -86,37 +86,6 @@ function fmtTime(s: number): string {
     : `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
-interface Props {
-  variant?: "full" | "compact" | "mini";
-}
-
-// ── Mini: solo controles + título (variante compacta, actualmente sin uso) ──
-export function MediaMini() {
-  const { info, togglePlay, skipNext, skipPrev } = useMediaInfo();
-
-  if (!info.has_session) return <span className="empty-label">Sin música</span>;
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-      <span style={{
-        fontSize: 11, fontWeight: 600, color: "rgba(200,215,255,0.85)",
-        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-        maxWidth: 88, fontFamily: "-apple-system,'SF Pro Text','Segoe UI',system-ui,sans-serif",
-        textShadow: "0 0 8px rgba(100,140,255,0.3)",
-      }}>
-        {info.title || "♪"}
-      </span>
-      <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-        <button className="media-btn" onClick={skipPrev} style={{ fontSize: 11, width: 20, height: 20 }}>⏮</button>
-        <button className="media-btn play" onClick={togglePlay} style={{ fontSize: 14, width: 22, height: 22 }}>
-          {info.is_playing ? "⏸" : "▶"}
-        </button>
-        <button className="media-btn" onClick={skipNext} style={{ fontSize: 11, width: 20, height: 20 }}>⏭</button>
-      </div>
-    </div>
-  );
-}
-
 // ── Full: vinyl + visualizador + controles ────────────────────────────────
 export function MediaFull() {
   const { info, progress, liveSeconds, togglePlay, skipNext, skipPrev } = useMediaInfo();
@@ -209,11 +178,4 @@ export function MediaCompact() {
       </button>
     </div>
   );
-}
-
-// ── Default export backward-compat ───────────────────────────────────────
-export function MediaView({ variant = "full" }: Props) {
-  if (variant === "mini")    return <MediaMini />;
-  if (variant === "compact") return <MediaCompact />;
-  return <MediaFull />;
 }

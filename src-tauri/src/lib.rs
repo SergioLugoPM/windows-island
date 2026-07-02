@@ -1,50 +1,15 @@
 pub mod cpu_temp;
 pub mod gpu_stats;
 pub mod i18n;
-pub mod injection;
-pub mod injector;
 pub mod media;
 pub mod stats;
 pub mod weather;
 
 use std::{
-    sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}},
+    sync::{Arc, Mutex},
     time::Instant,
 };
 use tauri::{Manager, State};
-use crate::injector::{Injector, theme::ThemeManager};
-use crate::injection::{IpcServer, IpcThemeConfig};
-
-// ─── IPC Server (theme config shared memory) ─────────────────────────────────
-//
-// `OnceLock::get_or_try_init` is not yet stable (tracking issue #109737).
-// Instead we keep the server in a `Mutex<Option<IpcServer>>` and initialise
-// it once, the first time any code calls `with_ipc_server`.
-
-static IPC_SERVER: Mutex<Option<IpcServer>> = Mutex::new(None);
-
-/// Initialise the IPC server on first call and call `f` with a reference.
-/// Subsequent calls reuse the already-initialised server.
-fn with_ipc_server<F, T>(f: F) -> Result<T, String>
-where
-    F: FnOnce(&IpcServer) -> Result<T, String>,
-{
-    let mut guard = IPC_SERVER
-        .lock()
-        .map_err(|e| format!("IPC server mutex poisoned: {}", e))?;
-    if guard.is_none() {
-        *guard = Some(
-            IpcServer::new().map_err(|e| format!("IPC server init failed: {}", e))?,
-        );
-    }
-    f(guard.as_ref().unwrap())
-}
-
-/// Attempt to initialise the IPC server without returning the guard.
-/// Used in the setup phase where we only want the side-effect of creation.
-fn init_ipc_server() -> Result<(), String> {
-    with_ipc_server(|_| Ok(()))
-}
 
 // ─── Raw Win32 FFI ─────────────────────────────────────────────────────────────
 
@@ -72,70 +37,6 @@ mod win_sys {
             lp_name:  *const u16,
         ) -> *mut core::ffi::c_void;
         fn GetLastError() -> u32;
-        // Changes the system color table entries and forces a WM_SYSCOLORCHANGE broadcast
-        fn SetSysColors(
-            n_changes:    c_int,
-            lp_sys_color: *const c_int,
-            lp_color_values: *const u32,
-        ) -> i32;
-        // Send a message to all top-level windows (HWND_BROADCAST = 0xFFFF)
-        fn SendNotifyMessageW(hwnd: isize, msg: u32, wparam: usize, lparam: isize) -> i32;
-    }
-
-    /// Apply a dark or light theme by writing directly to the Windows system
-    /// color table via `SetSysColors`.  This is the approach that actually
-    /// affects the taskbar on Windows 11.
-    ///
-    /// `SetSysColors` internally broadcasts `WM_SYSCOLORCHANGE` to all windows,
-    /// so we don't need a separate broadcast for the color-table change.
-    /// We send `WM_SETTINGCHANGE` as well so apps that watch settings are notified.
-    pub fn apply_sys_colors(dark: bool) {
-        // COLOR_* indices we want to override
-        //  3 = COLOR_WINDOW        (window background)
-        //  8 = COLOR_WINDOWTEXT    (window text)
-        // 15 = COLOR_3DFACE        (button/dialog/taskbar face)
-        // 16 = COLOR_3DSHADOW      (shadow edges)
-        // 17 = COLOR_GRAYTEXT      (disabled text)
-        // 18 = COLOR_HIGHLIGHT     (selected item background)
-        // 19 = COLOR_HIGHLIGHTTEXT (selected item text)
-        // 20 = COLOR_BTNFACE       (button face — alias for 3DFACE on Win11)
-        let indices: [c_int; 8] = [3, 8, 15, 16, 17, 18, 19, 20];
-
-        let (bg, text, face, shadow, gray, highlight, hl_text, btn): (u32,u32,u32,u32,u32,u32,u32,u32) =
-            if dark {
-                // Dark theme — charcoal tones
-                (0x1a1a1a, 0xf0f0f0, 0x2d2d2d, 0x141414, 0x808080, 0x4a90d9, 0xffffff, 0x2d2d2d)
-            } else {
-                // Light theme — restore Windows defaults
-                (0xffffff, 0x000000, 0xf0f0f0, 0xa0a0a0, 0x6d6d6d, 0x0078d7, 0xffffff, 0xf0f0f0)
-            };
-
-        // Win32 color values are 0x00BBGGRR (not 0x00RRGGBB)
-        let to_bgr = |rgb: u32| -> u32 {
-            let r = (rgb >> 16) & 0xFF;
-            let g = (rgb >>  8) & 0xFF;
-            let b =  rgb        & 0xFF;
-            (b << 16) | (g << 8) | r
-        };
-
-        let values: [u32; 8] = [
-            to_bgr(bg), to_bgr(text), to_bgr(face), to_bgr(shadow),
-            to_bgr(gray), to_bgr(highlight), to_bgr(hl_text), to_bgr(btn),
-        ];
-
-        unsafe {
-            SetSysColors(indices.len() as c_int, indices.as_ptr(), values.as_ptr());
-            // WM_SETTINGCHANGE (0x001A) with "ImmersiveColorSet" notifies modern apps
-            let param = "ImmersiveColorSet\0"
-                .encode_utf16()
-                .collect::<Vec<u16>>();
-            SendNotifyMessageW(0xFFFF, 0x001A, 0, param.as_ptr() as isize);
-        }
-    }
-
-    /// Restore default Windows system colors (light theme).
-    pub fn restore_sys_colors() {
-        apply_sys_colors(false);
     }
 
     /// Enable or disable the Mica backdrop effect on a window handle.
@@ -206,73 +107,9 @@ pub struct AppState {
     weather_cache: Arc<Mutex<Option<(weather::WeatherInfo, Instant)>>>,
     stats: Arc<stats::StatsState>,
     pub i18n: Arc<Mutex<i18n::I18n>>,
-    pub injector: Arc<Injector>,
-    pub theme_manager: Arc<Mutex<ThemeManager>>,
-    pub injection_active: Arc<AtomicBool>,
 }
 
 // ─── Tauri commands ───────────────────────────────────────────────────────────
-
-#[tauri::command]
-async fn enable_theme_injection(
-    state: tauri::State<'_, AppState>,
-    theme_name: String,
-) -> Result<(), String> {
-    if state.injection_active.load(Ordering::Relaxed) {
-        return Ok(()); // Already active
-    }
-
-    // Select theme
-    let theme = match theme_name.as_str() {
-        "dark" => injector::theme::InjectedTheme::dark_theme(),
-        "light" => injector::theme::InjectedTheme::light_theme(),
-        "vidrio" => injector::theme::InjectedTheme::vidrio_theme(),
-        _ => injector::theme::InjectedTheme::dark_theme(),
-    };
-
-    // Write theme to shared memory
-    state.theme_manager
-        .lock()
-        .unwrap()
-        .write_theme(&theme)
-        .map_err(|e| format!("Failed to write theme: {}", e))?;
-
-    // Inject into Explorer
-    state.injector
-        .inject_into_explorer()
-        .map_err(|e| match e {
-            injector::InjectorError::OpenProcessFailed(_) =>
-                "Administrator required — right-click Nimbo and select 'Run as administrator'".to_string(),
-            injector::InjectorError::DllNotFound =>
-                "Injector DLL not found. Try rebuilding the app.".to_string(),
-            other => format!("Injection failed: {:?}", other),
-        })?;
-
-    // Inject into StartMenuExperienceHost (Win11)
-    let _ = state.injector.inject_into_startmenu();
-
-    // Apply system colors directly — this is what actually changes the taskbar
-    // on Windows 11, which uses DWM/Mica rather than GetSysColor for rendering.
-    #[cfg(target_os = "windows")]
-    win_sys::apply_sys_colors(theme_name != "light");
-
-    state.injection_active.store(true, Ordering::Relaxed);
-    Ok(())
-}
-
-#[tauri::command]
-async fn disable_theme_injection(state: tauri::State<'_, AppState>) -> Result<(), String> {
-    state.injection_active.store(false, Ordering::Relaxed);
-    // Restore default Windows system colors
-    #[cfg(target_os = "windows")]
-    win_sys::restore_sys_colors();
-    Ok(())
-}
-
-#[tauri::command]
-fn is_injection_active(state: tauri::State<'_, AppState>) -> bool {
-    state.injection_active.load(Ordering::Relaxed)
-}
 
 /// Returns the current Windows accent color and dark-mode setting so the
 /// island can mirror the system theme.
@@ -282,9 +119,6 @@ fn is_injection_active(state: tauri::State<'_, AppState>) -> bool {
 fn get_windows_theme() -> serde_json::Value {
     #[cfg(target_os = "windows")]
     {
-        use std::ffi::OsStr;
-        use std::os::windows::ffi::OsStrExt;
-
         // ── Read dark/light mode ──────────────────────────────────────────────
         let is_dark = read_reg_dword(
             "Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
@@ -541,30 +375,6 @@ fn set_locale(state: State<'_, AppState>, locale: String) {
     state.i18n.lock().unwrap().set_locale(&locale);
 }
 
-/// Push a theme configuration to the injected DLL via the IPC shared memory.
-///
-/// Accepted `config_name` values: `"dark"`, `"light"`.
-/// Returns `Err` for unknown names or if the IPC server fails to initialise.
-#[tauri::command]
-fn update_injected_theme(config_name: String) -> Result<(), String> {
-    let config = match config_name.as_str() {
-        "dark" => IpcThemeConfig::dark_theme(),
-        "light" => IpcThemeConfig::light_theme(),
-        _ => return Err(format!("Unknown theme '{}'; expected 'dark' or 'light'", config_name)),
-    };
-    with_ipc_server(|server| server.update_config(config))
-}
-
-/// Signal the injected DLL to re-read the IPC config.
-///
-/// In a future phase, this could use a pipe / event to wake the DLL.
-/// For now it is a placeholder that returns success so the frontend can
-/// complete the "theme change → IPC update → DLL refresh" loop.
-#[tauri::command]
-fn refresh_injected_theme_config() -> Result<(), String> {
-    Ok(())
-}
-
 // ─── Multi-monitor support ─────────────────────────────────────────────────────
 
 #[derive(serde::Serialize)]
@@ -623,41 +433,13 @@ pub fn run() {
         return; // another instance is running — exit silently
     }
 
-    // Get or compute DLL path
-    let dll_path = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-        .map(|p| p.join("windows_island_injector_dll.dll"))
-        .unwrap_or_else(|| "windows_island_injector_dll.dll".into());
-
-    // Create injector
-    let injector = Arc::new(Injector::new(dll_path));
-
-    // Create theme manager
-    let theme_manager = Arc::new(Mutex::new(
-        ThemeManager::new()
-            .expect("Failed to initialize theme manager")
-    ));
-
-    // Atomic bool for injection state
-    let injection_active = Arc::new(AtomicBool::new(false));
-
     tauri::Builder::default()
         .manage(AppState {
             weather_cache: Arc::new(Mutex::new(None)),
             stats: Arc::new(stats::StatsState::default()),
             i18n: Arc::new(Mutex::new(i18n::I18n::default())),
-            injector,
-            theme_manager,
-            injection_active,
         })
         .setup(|app| {
-            // ── IPC server init (shared memory for DLL theme config) ──────────
-            // Initialise early so the mapping exists before the DLL is injected.
-            if let Err(e) = init_ipc_server() {
-                eprintln!("[IPC] Warning: could not start IPC server: {}", e);
-            }
-
             let win = app.get_webview_window("main").unwrap();
             win.set_always_on_top(true)?;
 
@@ -793,11 +575,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            update_injected_theme,
-            refresh_injected_theme_config,
-            enable_theme_injection,
-            disable_theme_injection,
-            is_injection_active,
             get_windows_theme,
             get_window_monitor,
             resize_window,
