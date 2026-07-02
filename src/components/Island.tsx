@@ -145,6 +145,7 @@ export function Island() {
   const [liqIntensity, setLiq]    = useState(0.4);
   const [settings, setSettings]   = useState<Settings>(loadSettings);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [nowPlayingTitle, setNowPlayingTitle] = useState("");
   const [snapEdge, setSnapEdge]   = useState<SnapEdge>("top");
 
   // This window's Tauri label (e.g. "main", "island_1") — stable ref for async callbacks.
@@ -229,8 +230,9 @@ export function Island() {
     const poll = async () => {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
-        const info = await invoke<{ is_playing: boolean }>("get_media_info");
+        const info = await invoke<{ is_playing: boolean; title: string }>("get_media_info");
         setIsPlaying(info?.is_playing ?? false);
+        setNowPlayingTitle(info?.is_playing ? (info?.title ?? "") : "");
       } catch { setIsPlaying(true); }
     };
     poll();
@@ -569,7 +571,7 @@ export function Island() {
                 transition={springFast}
                 style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}
               >
-                <Clock variant="idle" format={settings.clockFormat} showSeconds={settings.showSeconds} />
+                <Clock variant="idle" format={settings.clockFormat} showSeconds={settings.showSeconds} nowPlaying={nowPlayingTitle || undefined} />
                 {isPlaying && (
                   <AudioVisualizer
                     bars={idleAudio.bars}

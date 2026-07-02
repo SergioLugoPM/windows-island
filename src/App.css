@@ -265,13 +265,13 @@
 /* ─── Clock size overrides for idle mode ─── */
 /* Applied via .clock-size-{s|m|l} wrapper on the idle motion.div */
 .clock-size-s .clock-idle-time { font-size: 18px; letter-spacing: -0.5px; }
-.clock-size-s .clock-idle-date { font-size: 9px; }
+.clock-size-s .clock-idle-date { font-size: 9px; max-width: 130px; }
 .clock-size-s .clock-idle-ampm { font-size: 9px; }
 
 /* M = default — no overrides needed (matches base styles) */
 
 .clock-size-l .clock-idle-time { font-size: 34px; letter-spacing: -1.5px; }
-.clock-size-l .clock-idle-date { font-size: 11px; letter-spacing: 0.9px; }
+.clock-size-l .clock-idle-date { font-size: 11px; letter-spacing: 0.9px; max-width: 200px; }
 .clock-size-l .clock-idle-ampm { font-size: 13px; }
 
 .clock-idle-time {
@@ -302,6 +302,9 @@
   text-transform: uppercase;
   line-height: 1;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
 }
 
 

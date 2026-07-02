@@ -41,9 +41,10 @@ interface Props {
   format?: ClockFormat;
   variant?: "idle" | "compact" | "expanded";
   showSeconds?: boolean;
+  nowPlaying?: string;
 }
 
-export function Clock({ format = "24h", variant = "expanded", showSeconds = false }: Props) {
+export function Clock({ format = "24h", variant = "expanded", showSeconds = false, nowPlaying }: Props) {
   const [data, setData] = useState<ClockData>(() => getNow(format));
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export function Clock({ format = "24h", variant = "expanded", showSeconds = fals
           {data.ampm && <span className="clock-idle-ampm">{data.ampm}</span>}
         </div>
         <span className="clock-idle-date">
-          {data.day.slice(0, 3).toUpperCase()} · {data.date}
+          {nowPlaying ? `♪ ${nowPlaying}` : `${data.day.slice(0, 3).toUpperCase()} · ${data.date}`}
         </span>
       </div>
     );
