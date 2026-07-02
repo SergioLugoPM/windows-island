@@ -1,10 +1,9 @@
 # Screenshots
 
-Place screenshots / GIFs here, then uncomment the image block at the top of the root README.md.
+Referenced from the root README.md.
 
-Suggested files:
-- `hero.png` — wide screenshot of the island in dark theme on top of a colorful desktop
-- `themes.png` — three-panel comparison: Dark / Light / Glass
-- `media.png` — media mode with vinyl + visualizer
-- `settings.png` — settings panel open
-- `demo.gif` — 10-15s recording showing cycle through modes
+- `nimbo-idle.png` — idle pill (clock, dark theme)
+- `nimbo-full.png` — full mode (clock + weather + media)
+- `nimbo-media.png` — media mode (vinyl + transport controls)
+- `nimbo-stats.png` — stats mode (CPU/RAM/disk/network)
+- `nimbo-weather.png` — weather mode (animated backdrop + conditions)
