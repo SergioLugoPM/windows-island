@@ -617,7 +617,7 @@ export function Island() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={springFast}
-                style={{ width: "100%" }}
+                style={{ width: "100%", height: "100%" }}
               >
                 <WeatherView />
               </motion.div>
@@ -630,7 +630,7 @@ export function Island() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={springFast}
-                style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}
+                style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", gap: 10 }}
               >
                 <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
                   <Clock variant="expanded" format={settings.clockFormat} />

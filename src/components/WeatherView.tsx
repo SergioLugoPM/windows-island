@@ -69,7 +69,7 @@ export function WeatherView({ city = "auto", compact = false }: Props) {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", position: "relative" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", height: "100%", position: "relative", justifyContent: "center" }}>
       <WeatherBackdrop iconCode={weather.icon_code} />
       <div className="weather-row" style={{ position: "relative", zIndex: 1 }}>
         <div className="weather-icon"><WeatherIcon iconCode={weather.icon_code} size={42} /></div>
